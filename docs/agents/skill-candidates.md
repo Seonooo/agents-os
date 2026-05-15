@@ -21,6 +21,8 @@
 | Task Context + AI summary + review.md flow | 3 | 2026-05-16 | 🟢 extracted | `.claude/skills/task-context-flow/` |
 | Hibernate column naming verification (snake_case mapping) | 1 | 2026-05-16 | ⚪ monitoring | — |
 | Testcontainers Postgres seed-then-GET test data setup | 2 | 2026-05-16 | 🟡 candidate (mostly absorbed in `tdd-endpoint` Round B) | — |
+| Atomic counter via `@Modifying @Query` + `clearAutomatically` | 1 | 2026-05-16 | ⚪ monitoring | — |
+| Domain exception → `@ExceptionHandler` → `ErrorResponse` mapping | 1 | 2026-05-16 | ⚪ monitoring | — |
 
 ## Detailed history
 
@@ -73,6 +75,20 @@ The "fill template → AI summarizes + asks → human corrects → record in `.r
 - 2026-05-16 — confirmed `SpringPhysicalNamingStrategy` default maps `createdAt → created_at`, `viewCount → view_count`.
 
 → Watch for second occurrence.
+
+### Atomic counter via `@Modifying @Query` + `clearAutomatically`
+**Count: 1 / Status: ⚪ monitoring**
+
+- 2026-05-16 — `PostRepository.incrementViewCount(id)` for GET `/posts/{id}` viewCount. Pattern: `@Modifying(clearAutomatically = true) @Query("UPDATE ... SET counter = counter + 1 WHERE id = :id")`. Returns affected row count for not-found detection. `clearAutomatically` ensures subsequent `findById` returns the post-UPDATE state (read-your-write).
+
+→ Watch for second occurrence (likes, replies, view-by-day counter, etc.). Extract at count=2.
+
+### Domain exception → `@ExceptionHandler` → `ErrorResponse` mapping
+**Count: 1 / Status: ⚪ monitoring**
+
+- 2026-05-16 — `PostNotFoundException` → `handlePostNotFound` in `RequestValidationExceptionHandler` → `ErrorResponse(code = RESOURCE_NOT_FOUND, ...)`. Pattern: custom exception class + `@ExceptionHandler(X.class)` method on existing advice + new `ErrorCode` enum value.
+
+→ Watch for second occurrence (DuplicatePostException, BusinessRuleViolation, etc.). Extract at count=2.
 
 ### Testcontainers Postgres seed-then-GET test data setup
 **Count: 2 / Status: 🟡 candidate**
