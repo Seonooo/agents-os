@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: board
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+  datasource:
+    hikari:
+      maximum-pool-size: 10
+  mvc:
+    problemdetails:
+      enabled: true

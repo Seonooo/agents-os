@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "Bash(gh api *)",
+      "Bash(gh search *)"
+    ],
+    "deny": [
+      "Edit(gradlew)",
+      "Edit(gradlew.bat)",
+      "Edit(gradle/wrapper/**)",
+      "Write(gradlew)",
+      "Write(gradlew.bat)",
+      "Write(gradle/wrapper/**)",
+      "Edit(src/test/java/com/example/board/support/TestcontainersConfiguration.java)",
+      "Write(src/test/java/com/example/board/support/TestcontainersConfiguration.java)",
+      "Edit(src/test/java/com/example/board/BoardApplicationTests.java)",
+      "Write(src/test/java/com/example/board/BoardApplicationTests.java)"
+    ]
+  }
+}
