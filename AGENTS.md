@@ -40,6 +40,8 @@ Each non-trivial task gets a context file:
 3. Human confirms or corrects; corrections are recorded in `.agent-os/tasks/<slug>.review.md`.
 4. Implementation proceeds via TDD.
 
+Iteration procedure: `.agent-os/loop.md`. Pre-commit verification: `.agent-os/harness.md`. Multi-file batch plans (optional): `.agent-os/batches/*.json`.
+
 ## Extended guidance (load on demand)
 
 Not auto-loaded — read explicitly when relevant (risky tasks, audits, onboarding):

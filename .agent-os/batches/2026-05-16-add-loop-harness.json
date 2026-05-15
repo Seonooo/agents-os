@@ -1,0 +1,56 @@
+{
+  "batch_id": "2026-05-16-add-loop-harness",
+  "purpose": "Backfill Notion-spec required .agent-os/ files (loop.md, harness.md) that were missing from initial Week 1 deliverables. Also introduce the JSON batch-plan pattern for multi-file change planning.",
+  "rationale": [
+    "Notion spec at https://www.notion.so/36085ab46da8813f8cfee6d5982ec0d0 specifies .agent-os/{context-template.md, loop.md, harness.md} as the minimal Agent OS kit for Week 1.",
+    "We previously created only context-template.md. loop.md and harness.md were missing, leaving the Notion-defined deliverable incomplete.",
+    "User asked whether JSON could help manage parallel work — this file demonstrates the pattern."
+  ],
+  "design_principles": {
+    "auto_loaded": false,
+    "scope": "per-batch planning artifact, persisted alongside the change for audit",
+    "ownership": "human-authored or AI-drafted before execution, reviewed once, then frozen as historical record"
+  },
+  "operations": [
+    {
+      "op": "write",
+      "path": ".agent-os/loop.md",
+      "content_summary": "Slim iteration procedure (4 phases) pointing to task-context-flow + tdd-endpoint Skills and harness.md.",
+      "expected_size_lines_max": 50
+    },
+    {
+      "op": "write",
+      "path": ".agent-os/harness.md",
+      "content_summary": "Verification checklist: automated (gradle test) + manual (per task) + failure-mode questions.",
+      "expected_size_lines_max": 50
+    },
+    {
+      "op": "write",
+      "path": ".agent-os/batches/2026-05-16-add-loop-harness.json",
+      "content_summary": "This very file — batch plan as artifact + demo of JSON-for-parallel pattern.",
+      "expected_size_lines_max": 80
+    },
+    {
+      "op": "edit",
+      "path": "AGENTS.md",
+      "section": "Task workflow",
+      "change": "Append a line after step 4 pointing to .agent-os/loop.md, harness.md, and batches/ JSON pattern."
+    }
+  ],
+  "expected_files_changed": 4,
+  "parallel_execution": {
+    "strategy": "single function_calls block with 4 independent invokes — 3 Writes + 1 Edit, no inter-operation dependencies",
+    "sequential_fallback": "if any invoke fails (e.g., Edit text mismatch), rerun only the failed one"
+  },
+  "verification": [
+    "wc -lc on .agent-os/loop.md and .agent-os/harness.md (each <= 50 lines target)",
+    "git status confirms 4 paths changed (3 new + 1 modified)",
+    "Re-read AGENTS.md to confirm pointer integrated cleanly into Task workflow section"
+  ],
+  "commit_message_summary": "Add Notion-spec .agent-os/{loop,harness}.md + JSON batch-plan demo",
+  "future_uses_of_batch_pattern": [
+    "Any multi-file change touching >= 3 files",
+    "Cross-cutting refactors (e.g., renaming a contract across controllers/tests/docs)",
+    "Pre-implementation reviews where the operations list itself is part of the discussion"
+  ]
+}
