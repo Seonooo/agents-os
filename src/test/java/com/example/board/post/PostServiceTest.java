@@ -17,8 +17,13 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 
+import java.util.Optional;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -94,5 +99,37 @@ class PostServiceTest {
         assertThat(result.size()).isEqualTo(20);
         assertThat(result.totalElements()).isEqualTo(2L);
         assertThat(result.totalPages()).isEqualTo(1);
+    }
+
+    @Test
+    void find_increments_view_count_then_fetches_and_returns_mapped_response() {
+        Long id = 42L;
+        Post fetched = new Post("alice", "Hello", "World", FIXED_NOW).withId(id);
+        when(postRepository.incrementViewCount(id)).thenReturn(1);
+        when(postRepository.findById(id)).thenReturn(Optional.of(fetched));
+
+        PostResponse response = postService.find(id);
+
+        org.mockito.InOrder order = inOrder(postRepository);
+        order.verify(postRepository).incrementViewCount(id);
+        order.verify(postRepository).findById(id);
+
+        assertThat(response.id()).isEqualTo(id);
+        assertThat(response.author()).isEqualTo("alice");
+        assertThat(response.title()).isEqualTo("Hello");
+        assertThat(response.content()).isEqualTo("World");
+        assertThat(response.createdAt()).isEqualTo(FIXED_NOW);
+        assertThat(response.updatedAt()).isEqualTo(FIXED_NOW);
+    }
+
+    @Test
+    void find_throws_PostNotFoundException_when_increment_returns_zero() {
+        Long id = 99L;
+        when(postRepository.incrementViewCount(id)).thenReturn(0);
+
+        assertThatThrownBy(() -> postService.find(id))
+                .isInstanceOf(PostNotFoundException.class);
+
+        verify(postRepository, never()).findById(any());
     }
 }

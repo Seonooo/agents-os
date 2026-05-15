@@ -1,11 +1,13 @@
 package com.example.board.post;
 
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
@@ -55,6 +57,22 @@ class RequestValidationExceptionHandler extends ResponseEntityExceptionHandler {
                 })
                 .toList();
         return validationResponse(fieldErrors, status, request);
+    }
+
+    @ExceptionHandler(PostNotFoundException.class)
+    public ResponseEntity<Object> handlePostNotFound(
+            PostNotFoundException ex,
+            WebRequest request) {
+        ErrorResponse body = new ErrorResponse(
+                ErrorCode.RESOURCE_NOT_FOUND,
+                ex.getMessage(),
+                pathOf(request),
+                Instant.now(clock),
+                null
+        );
+        HttpHeaders responseHeaders = new HttpHeaders();
+        responseHeaders.setContentType(MediaType.APPLICATION_JSON);
+        return new ResponseEntity<>(body, responseHeaders, HttpStatus.NOT_FOUND);
     }
 
     private ResponseEntity<Object> validationResponse(

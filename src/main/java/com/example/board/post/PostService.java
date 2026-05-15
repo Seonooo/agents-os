@@ -36,4 +36,15 @@ public class PostService {
         Page<PostResponse> mapped = postRepository.findAll(pageable).map(PostResponse::from);
         return PageResponse.from(mapped);
     }
+
+    @Transactional
+    public PostResponse find(Long id) {
+        int updated = postRepository.incrementViewCount(id);
+        if (updated == 0) {
+            throw new PostNotFoundException(id);
+        }
+        Post post = postRepository.findById(id)
+                .orElseThrow(() -> new PostNotFoundException(id));
+        return PostResponse.from(post);
+    }
 }

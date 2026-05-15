@@ -174,6 +174,47 @@ class PostControllerE2ETest {
     }
 
     @Test
+    void get_by_id_returns_200_and_increments_view_count_on_each_call() throws Exception {
+        Post saved = postRepository.save(new Post("alice", "Hello", "World", Instant.parse("2026-05-15T10:00:00Z")));
+        Long id = saved.getId();
+
+        mockMvc.perform(get("/posts/{id}", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id))
+                .andExpect(jsonPath("$.author").value("alice"))
+                .andExpect(jsonPath("$.title").value("Hello"))
+                .andExpect(jsonPath("$.content").value("World"))
+                .andExpect(jsonPath("$.viewCount").value(1));
+
+        mockMvc.perform(get("/posts/{id}", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.viewCount").value(2));
+    }
+
+    @Test
+    void get_by_id_returns_404_with_resource_not_found_when_id_missing() throws Exception {
+        mockMvc.perform(get("/posts/99999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").exists())
+                .andExpect(jsonPath("$.path").value("/posts/99999"))
+                .andExpect(jsonPath("$.timestamp").exists());
+    }
+
+    @Test
+    void get_by_id_returns_404_for_negative_id() throws Exception {
+        mockMvc.perform(get("/posts/-1"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
+    void get_by_id_returns_400_for_non_numeric_id() throws Exception {
+        mockMvc.perform(get("/posts/abc"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void get_with_custom_size_returns_partial_content_and_correct_total_pages() throws Exception {
         postRepository.saveAll(List.of(
                 new Post("alice", "First", "Body1", Instant.parse("2026-05-15T10:00:00Z")),
