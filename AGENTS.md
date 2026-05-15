@@ -21,6 +21,14 @@ These are auto-loaded by Claude Code from `.claude/rules/`:
 
 Other coding agents (Codex, Cursor, etc.) reading this `AGENTS.md` should also consult those two rule files.
 
+## Skills (model-invoked, progressive disclosure)
+
+Reusable workflows live under `.claude/skills/<name>/SKILL.md`. Claude Code discovers them automatically (loads only `name` + `description` until matched).
+
+- `.claude/skills/tdd-endpoint/` — 4-round TDD pattern for adding/refactoring HTTP endpoints.
+
+When a workflow is reused 2+ times, log it in `docs/agents/skill-candidates.md` and extract when stable.
+
 ## Task workflow
 
 Each non-trivial task gets a context file:
