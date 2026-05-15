@@ -16,11 +16,11 @@
 | Pattern | Count | Last seen | Status | Skill path |
 |---|---|---|---|---|
 | TDD 4-round for new HTTP endpoint | 3 | 2026-05-16 | 🟢 extracted | `.claude/skills/tdd-endpoint/` |
-| Spring Boot 4 API verification (renamed/moved classes) | 4 | 2026-05-16 | 🟡 candidate | — |
+| Spring Boot 4 API verification (renamed/moved classes) | 4 | 2026-05-16 | 🟢 extracted | `.claude/skills/spring-boot-4-verify/` |
+| `gh search code` / `gh api` for Spring source | 5+ | 2026-05-16 | 🟢 merged into `spring-boot-4-verify` | (same) |
 | Task Context + AI summary + review.md flow | 3 | 2026-05-16 | 🟡 candidate | — |
-| `gh search code` / `gh api` for Spring source | 5+ | 2026-05-16 | 🟡 candidate (likely merged into "SB4 API verification") | — |
 | Hibernate column naming verification (snake_case mapping) | 1 | 2026-05-16 | ⚪ monitoring | — |
-| Testcontainers Postgres seed-then-GET test data setup | 2 | 2026-05-16 | 🟡 candidate | — |
+| Testcontainers Postgres seed-then-GET test data setup | 2 | 2026-05-16 | 🟡 candidate (mostly absorbed in `tdd-endpoint` Round B) | — |
 
 ## Detailed history
 
@@ -34,7 +34,7 @@
 → **Extracted to `.claude/skills/tdd-endpoint/SKILL.md`** (2026-05-16).
 
 ### Spring Boot 4 API verification
-**Count: 4 / Status: 🟡 candidate**
+**Count: 4 / Status: 🟢 extracted**
 
 Pattern: when SB4 throws a `ClassNotFoundException`, `package does not exist`, or `cannot find symbol`, look up the class in spring-projects/spring-boot or spring-projects/spring-framework GitHub at the matching version tag to find the moved/renamed counterpart.
 
@@ -43,7 +43,7 @@ Pattern: when SB4 throws a `ClassNotFoundException`, `package does not exist`, o
 - 2026-05-15 — Jackson 3.x: `com.fasterxml.jackson.databind.ObjectMapper` → `tools.jackson.databind.ObjectMapper` (annotations remain at `com.fasterxml.jackson.annotation.*`).
 - 2026-05-16 — `HandlerMethodValidationException` API: not `getAllValidationResults()`, actual API is `getParameterValidationResults()`.
 
-→ Pending: candidate stable enough; extract when next SB4 surprise hits.
+→ **Extracted to `.claude/skills/spring-boot-4-verify/SKILL.md`** (2026-05-16). Includes the migration catalog above plus the verification recipe (`gh search code`, `gh api`, Spring Initializr cross-check, WebFetch on docs).
 
 ### Task Context + AI summary + review.md flow
 **Count: 3 / Status: 🟡 candidate**
@@ -57,7 +57,7 @@ The "fill template → AI summarizes + asks → human corrects → record in `.r
 → Pending: depends on whether we want a slash-command-style helper or just a Skill that the model invokes when seeing a new Task Context file.
 
 ### `gh search code` / `gh api` for Spring source inspection
-**Count: 5+ / Status: 🟡 candidate (likely merged into SB4 API verification)**
+**Count: 5+ / Status: 🟢 merged into `spring-boot-4-verify`**
 
 - BOM testcontainers entry lookup
 - HandlerMethodValidationException source
@@ -65,7 +65,7 @@ The "fill template → AI summarizes + asks → human corrects → record in `.r
 - JacksonAutoConfiguration location
 - spring-boot-flyway module build.gradle
 
-→ Best merged into the SB4 API verification skill as a sub-tool of "verify before guessing".
+→ Merged: these are the primary discovery tools used by `spring-boot-4-verify` Skill (Recipe Step 1 & 2).
 
 ### Hibernate column naming verification
 **Count: 1 / Status: ⚪ monitoring**

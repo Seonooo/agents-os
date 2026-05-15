@@ -26,6 +26,7 @@ Other coding agents (Codex, Cursor, etc.) reading this `AGENTS.md` should also c
 Reusable workflows live under `.claude/skills/<name>/SKILL.md`. Claude Code discovers them automatically (loads only `name` + `description` until matched).
 
 - `.claude/skills/tdd-endpoint/` — 4-round TDD pattern for adding/refactoring HTTP endpoints.
+- `.claude/skills/spring-boot-4-verify/` — verify-before-guessing recipe for Spring Boot 4 surprises (package moves, autoconfig module splits, API renames) + migration catalog.
 
 When a workflow is reused 2+ times, log it in `docs/agents/skill-candidates.md` and extract when stable.
 
