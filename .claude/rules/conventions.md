@@ -37,6 +37,10 @@
 - IDs use `Long` + `GenerationType.IDENTITY` (Postgres `BIGSERIAL`).
 - Time stored as `Instant` → Postgres `TIMESTAMP WITH TIME ZONE`.
 - Naming: rely on Spring's default `SpringPhysicalNamingStrategy` (camelCase → snake_case).
+- **Soft delete**: use Hibernate `@SQLRestriction("deleted_at IS NULL")` at entity class level. Auto-filters every entity-based read (`findById`, `findAll(Pageable)`, derived methods, etc.).
+- **GOTCHA — `@Modifying @Query` does NOT inherit `@SQLRestriction`.** Any HQL/JPQL `UPDATE` or `DELETE` query targeting a soft-deletable entity must explicitly add `AND p.deletedAt IS NULL` (or the equivalent column predicate). Forgetting this lets writes mutate logically-deleted rows.
+- Soft-deletable entities expose a `delete(Instant)` **domain method**, not a setter. Service layer pattern: `findById(id).orElseThrow(...Exception::new).delete(clock.instant())` — JPA dirty checking issues the UPDATE on transaction commit. Never call `repository.deleteById(id)` on a soft-deletable entity (that performs hard delete).
+- Mutable domain state on JPA entities goes through named domain methods (`post.update(...)`, `post.delete(...)`), never raw setters.
 
 ## Testing
 

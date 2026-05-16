@@ -23,8 +23,8 @@
 | Testcontainers Postgres seed-then-GET test data setup | 2 | 2026-05-16 | 🟡 candidate (mostly absorbed in `tdd-endpoint` Round B) | — |
 | Atomic counter via `@Modifying @Query` + `clearAutomatically` | 1 | 2026-05-16 | ⚪ monitoring | — |
 | Domain exception → `@ExceptionHandler` → `ErrorResponse` mapping | 1 | 2026-05-16 | ⚪ monitoring | — |
-| Soft delete via `@SQLRestriction` + `@Modifying @Query` explicit filter | 1 | 2026-05-16 | ⚪ monitoring | — |
-| Mutable domain methods on JPA entity (`update`, `delete`) instead of setters | 1 | 2026-05-16 | ⚪ monitoring | — |
+| Soft delete via `@SQLRestriction` + `@Modifying @Query` explicit filter | 1 | 2026-05-16 | ⚪ monitoring (gotcha documented in `.claude/rules/conventions.md`) | — |
+| Mutable domain methods on JPA entity (`update`, `delete`) instead of setters | 1 | 2026-05-16 | ⚪ monitoring (rule in `.claude/rules/conventions.md`) | — |
 | Flyway V2+ migration (additive ALTER without index) | 1 | 2026-05-16 | ⚪ monitoring | — |
 | Reusing existing domain exception across new endpoints (no new exception class) | 1 | 2026-05-16 | ⚪ monitoring | — |
 
