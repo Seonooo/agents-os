@@ -1,0 +1,175 @@
+= Board API Documentation
+:doctype: book
+:icons: font
+:source-highlighter: highlightjs
+:toc: left
+:toclevels: 2
+:sectlinks:
+:snippets: ../../../build/generated-snippets
+
+== Overview
+
+MVP 게시판 API. 인증 없음. 모든 응답은 JSON. 에러 응답은 단일 계약(`ErrorResponse`)을 따른다.
+
+* 기본 호스트: `http://localhost:8080`
+* Content-Type: `application/json`
+
+== Error contract
+
+검증 실패(`VALIDATION_FAILED`)와 자원 없음(`RESOURCE_NOT_FOUND`)은 모두 `ErrorResponse` 형식.
+
+```json
+{
+  "code": "VALIDATION_FAILED",
+  "message": "Request validation failed",
+  "path": "/posts",
+  "timestamp": "2026-05-16T...",
+  "errors": [
+    {"field": "title", "message": "must not be blank"}
+  ]
+}
+```
+
+* `code` — `ErrorCode` enum 이름
+* `message` — 사람용 메시지
+* `path` — 요청 path (query string 제외)
+* `timestamp` — 응답 생성 시각 (ISO-8601 UTC)
+* `errors` — 검증 실패 시만. 그 외엔 생략(`@JsonInclude(NON_NULL)`)
+
+== POST /posts — 게시글 작성
+
+새 게시글을 생성. `viewCount`는 `0`으로 초기화, `createdAt`/`updatedAt`은 서버 시점.
+
+=== 성공 (`201 Created`)
+
+operation::post-create-happy[snippets='http-request,request-fields,http-response,response-headers,response-fields']
+
+=== 검증 실패: author 누락
+
+operation::post-create-missing-author[snippets='http-request,request-fields,http-response,response-fields']
+
+=== 검증 실패: title 공백만
+
+operation::post-create-whitespace-title[snippets='http-request,request-fields,http-response,response-fields']
+
+=== 검증 실패: content 누락
+
+operation::post-create-missing-content[snippets='http-request,request-fields,http-response,response-fields']
+
+=== 검증 실패: author 길이 초과 (>30자)
+
+operation::post-create-oversized-author[snippets='http-request,request-fields,http-response,response-fields']
+
+=== 검증 실패: title 길이 초과 (>80자)
+
+operation::post-create-oversized-title[snippets='http-request,request-fields,http-response,response-fields']
+
+=== 검증 실패: content 길이 초과 (>5000자)
+
+operation::post-create-oversized-content[snippets='http-request,request-fields,http-response,response-fields']
+
+== GET /posts — 게시글 목록 (페이지)
+
+서버 고정 정렬 `createdAt DESC, id DESC`. `sort` 파라미터 미지원. 소프트 삭제된 글은 제외.
+
+=== 빈 페이지
+
+operation::post-list-empty[snippets='http-request,query-parameters,http-response,response-fields']
+
+=== 여러 글 정렬 확인
+
+operation::post-list-multi-ordered[snippets='http-request,query-parameters,http-response,response-fields']
+
+=== 커스텀 size (페이지 분할)
+
+operation::post-list-paginated[snippets='http-request,query-parameters,http-response,response-fields']
+
+=== 검증 실패: 음수 page
+
+operation::post-list-negative-page[snippets='http-request,query-parameters,http-response,response-fields']
+
+=== 검증 실패: size=0
+
+operation::post-list-size-zero[snippets='http-request,query-parameters,http-response,response-fields']
+
+=== 검증 실패: size>100
+
+operation::post-list-size-over-max[snippets='http-request,query-parameters,http-response,response-fields']
+
+=== 잘못된 타입의 page (비숫자)
+
+operation::post-list-non-numeric-page[snippets='http-request,query-parameters,http-response']
+
+== GET /posts/{id} — 게시글 상세
+
+호출마다 `viewCount` 원자적 +1 증가. 소프트 삭제된 글은 404.
+
+=== 성공 (`200 OK`, viewCount 증가)
+
+operation::post-get-happy[snippets='http-request,path-parameters,http-response,response-fields']
+
+=== 자원 없음 (`404`)
+
+operation::post-get-not-found[snippets='http-request,path-parameters,http-response,response-fields']
+
+=== 음수 id (자원 없음으로 처리, `404`)
+
+operation::post-get-negative-id[snippets='http-request,path-parameters,http-response,response-fields']
+
+=== 비숫자 id (`400`)
+
+operation::post-get-non-numeric-id[snippets='http-request,path-parameters,http-response']
+
+== PUT /posts/{id} — 게시글 수정
+
+`title`과 `content`만 수정. `author`/`createdAt`/`viewCount`/`id`는 보존. `updatedAt`은 서버 시점.
+
+=== 성공 (`200 OK`)
+
+operation::post-update-happy[snippets='http-request,path-parameters,request-fields,http-response,response-fields']
+
+=== 자원 없음 (`404`)
+
+operation::post-update-not-found[snippets='http-request,path-parameters,request-fields,http-response,response-fields']
+
+=== 검증 실패: title 누락
+
+operation::post-update-missing-title[snippets='http-request,path-parameters,request-fields,http-response,response-fields']
+
+=== 검증 실패: title 공백만
+
+operation::post-update-whitespace-title[snippets='http-request,path-parameters,request-fields,http-response,response-fields']
+
+=== 검증 실패: title 길이 초과 (>80자)
+
+operation::post-update-oversized-title[snippets='http-request,path-parameters,request-fields,http-response,response-fields']
+
+=== 검증 실패: content 누락
+
+operation::post-update-missing-content[snippets='http-request,path-parameters,request-fields,http-response,response-fields']
+
+=== 검증 실패: content 길이 초과 (>5000자)
+
+operation::post-update-oversized-content[snippets='http-request,path-parameters,request-fields,http-response,response-fields']
+
+== DELETE /posts/{id} — 게시글 삭제 (Soft Delete)
+
+`deleted_at` 컬럼만 갱신. 행은 DB에 남아있음. 삭제된 글은 GET·GET-list·PUT·DELETE 모든 경로에서 404로 처리됨.
+
+=== 성공 (`204 No Content`)
+
+operation::post-delete-success[snippets='http-request,path-parameters,http-response']
+
+=== 자원 없음 (`404`)
+
+operation::post-delete-not-found[snippets='http-request,path-parameters,http-response,response-fields']
+
+=== 같은 id를 두 번 DELETE (두 번째는 `404`)
+
+operation::post-delete-twice[snippets='http-request,path-parameters,http-response,response-fields']
+
+=== 삭제된 글이 목록에서 제외됨
+
+직전 DELETE로 소프트 삭제된 글이 후속 GET `/posts` 응답에서 빠짐.
+
+operation::post-delete-soft-excluded-from-list[snippets='http-request,query-parameters,http-response,response-fields']

@@ -27,6 +27,9 @@
 | Mutable domain methods on JPA entity (`update`, `delete`) instead of setters | 1 | 2026-05-16 | ⚪ monitoring (rule in `.claude/rules/conventions.md`) | — |
 | Flyway V2+ migration (additive ALTER without index) | 1 | 2026-05-16 | ⚪ monitoring | — |
 | Reusing existing domain exception across new endpoints (no new exception class) | 1 | 2026-05-16 | ⚪ monitoring | — |
+| REST Docs `document()` per E2E test + shared snippet helpers | 1 | 2026-05-16 | ⚪ monitoring | — |
+| Tests-as-docs philosophy (no separate doc-only tests) | 1 | 2026-05-16 | ⚪ monitoring (philosophical, may not become Skill) | — |
+| `JsonFieldType` + `.optional()` for absent-payload error fields | 1 | 2026-05-16 | ⚪ monitoring (gotcha worth documenting in conventions later) | — |
 
 ## Detailed history
 

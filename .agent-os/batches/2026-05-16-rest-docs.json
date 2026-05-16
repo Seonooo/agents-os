@@ -1,0 +1,136 @@
+{
+  "batch_id": "2026-05-16-rest-docs",
+  "purpose": "Introduce Spring REST Docs to generate snippets from all 29 existing E2E tests (tests-as-docs philosophy per Major correction in .review.md). Establish convention for future endpoints.",
+  "rationale": [
+    "Task Context (.agent-os/tasks/2026-05-16-rest-docs.md) defines the contract.",
+    "Review (.review.md) records the Major correction (5 happy paths -> all 29 E2E tests) and its 7 cascading effects.",
+    "tdd-endpoint Skill does NOT cleanly apply (no new endpoints — adding documentation to existing). Custom phase structure below."
+  ],
+  "design_principles": {
+    "auto_loaded": false,
+    "scope": "per-batch plan for REST Docs introduction. NOT a TDD task — adding document() to passing tests.",
+    "ownership": "AI-drafted from reviewed Task Context, frozen at execution time"
+  },
+  "phases": [
+    {
+      "phase": 1,
+      "name": "Infrastructure",
+      "operations": [
+        {
+          "op": "edit",
+          "path": "build.gradle.kts",
+          "content_summary": "Add plugins block entry: id(\"org.asciidoctor.jvm.convert\") version \"4.0.5\". Add tasks.asciidoctor { inputs.dir(snippetsDir); dependsOn(tasks.test) }. Optional: bootJar copy to static/docs."
+        },
+        {
+          "op": "edit",
+          "path": "src/test/java/com/example/board/post/PostControllerE2ETest.java",
+          "content_summary": "Add @AutoConfigureRestDocs class-level annotation. Add private static ResponseFieldsSnippet errorResponseFields() helper (returns responseFields with code/message/path/timestamp/errors[]/errors[].field/errors[].message; later ones .optional())."
+        }
+      ],
+      "expected_files_changed": 2,
+      "verification": "./gradlew test (existing 38 still green; no snippets yet because no document() calls)"
+    },
+    {
+      "phase": 2,
+      "name": "Document POST /posts (7 tests)",
+      "operations": [
+        {
+          "op": "edit",
+          "path": "src/test/java/com/example/board/post/PostControllerE2ETest.java",
+          "content_summary": "Add andDo(document(\"post-create-{case}\", ...)) to 7 POST tests. happy uses requestFields(PostCreateRequest fields) + responseFields(PostResponse) + responseHeaders(Location). 6 validation use requestFields + errorResponseFields()."
+        }
+      ],
+      "expected_files_changed": 1,
+      "verification": "./gradlew test --tests *.PostControllerE2ETest --rerun + ls build/generated-snippets/post-create-* (7 dirs)"
+    },
+    {
+      "phase": 3,
+      "name": "Document GET /posts list (7 tests)",
+      "operations": [
+        {
+          "op": "edit",
+          "path": "src/test/java/com/example/board/post/PostControllerE2ETest.java",
+          "content_summary": "Add document() to 7 GET-list tests. happy/multi/paginated use requestParameters(page/size) + responseFields(PageResponse + nested content[]). 4 validation use requestParameters + errorResponseFields()."
+        }
+      ],
+      "expected_files_changed": 1,
+      "verification": "ls build/generated-snippets/post-list-* (7 dirs)"
+    },
+    {
+      "phase": 4,
+      "name": "Document GET /posts/{id} (4 tests)",
+      "operations": [
+        {
+          "op": "edit",
+          "path": "src/test/java/com/example/board/post/PostControllerE2ETest.java",
+          "content_summary": "Add document() to 4 GET-by-id tests. happy uses pathParameters(id) + responseFields(PostResponse). 404 uses pathParameters + errorResponseFields(). non-numeric uses pathParameters only (no body assertion)."
+        }
+      ],
+      "expected_files_changed": 1,
+      "verification": "ls build/generated-snippets/post-get-* (4 dirs)"
+    },
+    {
+      "phase": 5,
+      "name": "Document PUT /posts/{id} (7 tests)",
+      "operations": [
+        {
+          "op": "edit",
+          "path": "src/test/java/com/example/board/post/PostControllerE2ETest.java",
+          "content_summary": "Add document() to 7 PUT tests. happy uses pathParameters + requestFields(PostUpdateRequest) + responseFields(PostResponse). 404 uses pathParameters + requestFields + errorResponseFields(). 5 validation use pathParameters + requestFields + errorResponseFields()."
+        }
+      ],
+      "expected_files_changed": 1,
+      "verification": "ls build/generated-snippets/post-update-* (7 dirs)"
+    },
+    {
+      "phase": 6,
+      "name": "Document DELETE /posts/{id} (4 tests)",
+      "operations": [
+        {
+          "op": "edit",
+          "path": "src/test/java/com/example/board/post/PostControllerE2ETest.java",
+          "content_summary": "Add document() to 4 DELETE tests. success uses pathParameters only (204 no body). 404/twice use pathParameters + errorResponseFields(). soft-excluded-from-list uses pathParameters only (asserts side-effect on subsequent GET, doc captures DELETE call)."
+        }
+      ],
+      "expected_files_changed": 1,
+      "verification": "ls build/generated-snippets/post-delete-* (4 dirs)"
+    },
+    {
+      "phase": 7,
+      "name": "Write index.adoc + asciidoctor verify + commit",
+      "operations": [
+        {
+          "op": "write",
+          "path": "src/main/asciidoc/index.adoc",
+          "content_summary": "AsciiDoc source with: title + intro + 5 endpoint sections (== headers). Each endpoint has === subsections per case, each subsection includes http-request, http-response, and relevant fields/parameters via include::{snippets}/<id>/<file>[]."
+        },
+        {
+          "op": "verify",
+          "path": "./gradlew test asciidoctor",
+          "content_summary": "Full chain: tests pass -> snippets generated -> asciidoctor renders -> build/docs/asciidoc/index.html exists and is readable."
+        },
+        {
+          "op": "edit",
+          "path": "docs/agents/skill-candidates.md",
+          "content_summary": "Add new monitoring entry: 'REST Docs document() per E2E test pattern' (count=1). Note `errorResponseFields()` shared helper as additional pattern. Note 'tests-as-docs philosophy' as separate philosophical entry (may not be a Skill candidate)."
+        }
+      ],
+      "expected_files_changed": "2-3 + commit"
+    }
+  ],
+  "global_verification": [
+    "All 38 prior tests still green (regression).",
+    "29 snippet directories under build/generated-snippets/.",
+    "Each snippet directory has at least http-request.adoc + http-response.adoc.",
+    "build/docs/asciidoc/index.html generated and visually navigable in browser.",
+    "harness.md walked explicitly before commit.",
+    "errorResponseFields() helper invoked from 16 error tests (POST 6 + PUT 6 + 4 not-found)."
+  ],
+  "parallel_execution_strategy": {
+    "Phase 1": "2 edits to different files -> single block, 2 invokes.",
+    "Phase 2-6": "Each phase is single-file (PostControllerE2ETest) sequential edits. Could be combined into one phase if edit blocks don't overlap, but separated for clarity and incremental verification.",
+    "Phase 7": "index.adoc write + tracker edit -> parallel block; verify + commit sequential."
+  },
+  "commit_message_summary": "Add REST Docs snippets for all 29 E2E tests + index.adoc + asciidoctor",
+  "process_note": "Per Week 1 spec deliverable 'AI 이해 요약 + 수정 흔적 1개 이상 기록', this batch and the .review.md sister file together comprise the visible before/after record. .review.md §1=BEFORE, §2=AFTER, §4=Trace table with both columns."
+}

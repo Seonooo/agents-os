@@ -4,10 +4,17 @@ import com.example.board.support.TestcontainersConfiguration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.restdocs.test.autoconfigure.AutoConfigureRestDocs;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.restdocs.headers.ResponseHeadersSnippet;
+import org.springframework.restdocs.payload.JsonFieldType;
+import org.springframework.restdocs.payload.RequestFieldsSnippet;
+import org.springframework.restdocs.payload.ResponseFieldsSnippet;
+import org.springframework.restdocs.request.PathParametersSnippet;
+import org.springframework.restdocs.request.QueryParametersSnippet;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import tools.jackson.databind.ObjectMapper;
@@ -18,6 +25,15 @@ import java.util.List;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.matchesPattern;
+import static org.springframework.restdocs.headers.HeaderDocumentation.headerWithName;
+import static org.springframework.restdocs.headers.HeaderDocumentation.responseHeaders;
+import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
+import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
+import static org.springframework.restdocs.payload.PayloadDocumentation.requestFields;
+import static org.springframework.restdocs.payload.PayloadDocumentation.responseFields;
+import static org.springframework.restdocs.request.RequestDocumentation.parameterWithName;
+import static org.springframework.restdocs.request.RequestDocumentation.pathParameters;
+import static org.springframework.restdocs.request.RequestDocumentation.queryParameters;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -29,6 +45,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@AutoConfigureRestDocs
 @Import(TestcontainersConfiguration.class)
 class PostControllerE2ETest {
 
@@ -46,6 +63,8 @@ class PostControllerE2ETest {
         postRepository.deleteAll();
     }
 
+    // ----- POST /posts -----
+
     @Test
     void valid_request_returns_201_with_location_and_body() throws Exception {
         PostCreateRequest request = new PostCreateRequest("alice", "Hello", "World");
@@ -61,7 +80,11 @@ class PostControllerE2ETest {
                 .andExpect(jsonPath("$.content").value("World"))
                 .andExpect(jsonPath("$.createdAt").exists())
                 .andExpect(jsonPath("$.updatedAt").exists())
-                .andExpect(jsonPath("$.viewCount").value(0));
+                .andExpect(jsonPath("$.viewCount").value(0))
+                .andDo(document("post-create-happy",
+                        postCreateRequestFields(),
+                        locationHeader(),
+                        postResponseFields()));
     }
 
     @Test
@@ -69,7 +92,10 @@ class PostControllerE2ETest {
         PostCreateRequest request = new PostCreateRequest(null, "Hello", "World");
 
         expectValidationFailure(perform(request))
-                .andExpect(jsonPath("$.errors[*].field").value(hasItem("author")));
+                .andExpect(jsonPath("$.errors[*].field").value(hasItem("author")))
+                .andDo(document("post-create-missing-author",
+                        postCreateRequestFields(),
+                        errorResponseFields()));
     }
 
     @Test
@@ -77,7 +103,10 @@ class PostControllerE2ETest {
         PostCreateRequest request = new PostCreateRequest("alice", "   ", "World");
 
         expectValidationFailure(perform(request))
-                .andExpect(jsonPath("$.errors[*].field").value(hasItem("title")));
+                .andExpect(jsonPath("$.errors[*].field").value(hasItem("title")))
+                .andDo(document("post-create-whitespace-title",
+                        postCreateRequestFields(),
+                        errorResponseFields()));
     }
 
     @Test
@@ -85,7 +114,10 @@ class PostControllerE2ETest {
         PostCreateRequest request = new PostCreateRequest("alice", "Hello", null);
 
         expectValidationFailure(perform(request))
-                .andExpect(jsonPath("$.errors[*].field").value(hasItem("content")));
+                .andExpect(jsonPath("$.errors[*].field").value(hasItem("content")))
+                .andDo(document("post-create-missing-content",
+                        postCreateRequestFields(),
+                        errorResponseFields()));
     }
 
     @Test
@@ -93,7 +125,10 @@ class PostControllerE2ETest {
         PostCreateRequest request = new PostCreateRequest("a".repeat(31), "Hello", "World");
 
         expectValidationFailure(perform(request))
-                .andExpect(jsonPath("$.errors[*].field").value(hasItem("author")));
+                .andExpect(jsonPath("$.errors[*].field").value(hasItem("author")))
+                .andDo(document("post-create-oversized-author",
+                        postCreateRequestFields(),
+                        errorResponseFields()));
     }
 
     @Test
@@ -101,7 +136,10 @@ class PostControllerE2ETest {
         PostCreateRequest request = new PostCreateRequest("alice", "t".repeat(81), "World");
 
         expectValidationFailure(perform(request))
-                .andExpect(jsonPath("$.errors[*].field").value(hasItem("title")));
+                .andExpect(jsonPath("$.errors[*].field").value(hasItem("title")))
+                .andDo(document("post-create-oversized-title",
+                        postCreateRequestFields(),
+                        errorResponseFields()));
     }
 
     @Test
@@ -109,8 +147,13 @@ class PostControllerE2ETest {
         PostCreateRequest request = new PostCreateRequest("alice", "Hello", "c".repeat(5001));
 
         expectValidationFailure(perform(request))
-                .andExpect(jsonPath("$.errors[*].field").value(hasItem("content")));
+                .andExpect(jsonPath("$.errors[*].field").value(hasItem("content")))
+                .andDo(document("post-create-oversized-content",
+                        postCreateRequestFields(),
+                        errorResponseFields()));
     }
+
+    // ----- GET /posts (list) -----
 
     @Test
     void get_returns_200_with_empty_page_when_no_posts() throws Exception {
@@ -120,7 +163,10 @@ class PostControllerE2ETest {
                 .andExpect(jsonPath("$.page").value(0))
                 .andExpect(jsonPath("$.size").value(20))
                 .andExpect(jsonPath("$.totalElements").value(0))
-                .andExpect(jsonPath("$.totalPages").value(0));
+                .andExpect(jsonPath("$.totalPages").value(0))
+                .andDo(document("post-list-empty",
+                        paginationQueryParameters(),
+                        pageResponseFields()));
     }
 
     @Test
@@ -142,7 +188,10 @@ class PostControllerE2ETest {
                 .andExpect(jsonPath("$.content[2].title").value("First"))
                 .andExpect(jsonPath("$.content[0].viewCount").value(0))
                 .andExpect(jsonPath("$.totalElements").value(3))
-                .andExpect(jsonPath("$.totalPages").value(1));
+                .andExpect(jsonPath("$.totalPages").value(1))
+                .andDo(document("post-list-multi-ordered",
+                        paginationQueryParameters(),
+                        pageResponseFields()));
     }
 
     @Test
@@ -151,7 +200,10 @@ class PostControllerE2ETest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.path").value("/posts"))
-                .andExpect(jsonPath("$.errors[*].field").value(hasItem("page")));
+                .andExpect(jsonPath("$.errors[*].field").value(hasItem("page")))
+                .andDo(document("post-list-negative-page",
+                        paginationQueryParameters(),
+                        errorResponseFields()));
     }
 
     @Test
@@ -159,7 +211,10 @@ class PostControllerE2ETest {
         mockMvc.perform(get("/posts").param("size", "0"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.errors[*].field").value(hasItem("size")));
+                .andExpect(jsonPath("$.errors[*].field").value(hasItem("size")))
+                .andDo(document("post-list-size-zero",
+                        paginationQueryParameters(),
+                        errorResponseFields()));
     }
 
     @Test
@@ -167,54 +222,18 @@ class PostControllerE2ETest {
         mockMvc.perform(get("/posts").param("size", "101"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.errors[*].field").value(hasItem("size")));
+                .andExpect(jsonPath("$.errors[*].field").value(hasItem("size")))
+                .andDo(document("post-list-size-over-max",
+                        paginationQueryParameters(),
+                        errorResponseFields()));
     }
 
     @Test
     void get_with_non_numeric_page_returns_400() throws Exception {
         mockMvc.perform(get("/posts").param("page", "abc"))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void get_by_id_returns_200_and_increments_view_count_on_each_call() throws Exception {
-        Post saved = postRepository.save(new Post("alice", "Hello", "World", Instant.parse("2026-05-15T10:00:00Z")));
-        Long id = saved.getId();
-
-        mockMvc.perform(get("/posts/{id}", id))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(id))
-                .andExpect(jsonPath("$.author").value("alice"))
-                .andExpect(jsonPath("$.title").value("Hello"))
-                .andExpect(jsonPath("$.content").value("World"))
-                .andExpect(jsonPath("$.viewCount").value(1));
-
-        mockMvc.perform(get("/posts/{id}", id))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.viewCount").value(2));
-    }
-
-    @Test
-    void get_by_id_returns_404_with_resource_not_found_when_id_missing() throws Exception {
-        mockMvc.perform(get("/posts/99999"))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
-                .andExpect(jsonPath("$.message").exists())
-                .andExpect(jsonPath("$.path").value("/posts/99999"))
-                .andExpect(jsonPath("$.timestamp").exists());
-    }
-
-    @Test
-    void get_by_id_returns_404_for_negative_id() throws Exception {
-        mockMvc.perform(get("/posts/-1"))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
-    }
-
-    @Test
-    void get_by_id_returns_400_for_non_numeric_id() throws Exception {
-        mockMvc.perform(get("/posts/abc"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andDo(document("post-list-non-numeric-page",
+                        paginationQueryParameters()));
     }
 
     @Test
@@ -231,7 +250,64 @@ class PostControllerE2ETest {
                 .andExpect(jsonPath("$.page").value(0))
                 .andExpect(jsonPath("$.size").value(1))
                 .andExpect(jsonPath("$.totalElements").value(2))
-                .andExpect(jsonPath("$.totalPages").value(2));
+                .andExpect(jsonPath("$.totalPages").value(2))
+                .andDo(document("post-list-paginated",
+                        paginationQueryParameters(),
+                        pageResponseFields()));
+    }
+
+    // ----- GET /posts/{id} -----
+
+    @Test
+    void get_by_id_returns_200_and_increments_view_count_on_each_call() throws Exception {
+        Post saved = postRepository.save(new Post("alice", "Hello", "World", Instant.parse("2026-05-15T10:00:00Z")));
+        Long id = saved.getId();
+
+        mockMvc.perform(get("/posts/{id}", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id))
+                .andExpect(jsonPath("$.author").value("alice"))
+                .andExpect(jsonPath("$.title").value("Hello"))
+                .andExpect(jsonPath("$.content").value("World"))
+                .andExpect(jsonPath("$.viewCount").value(1))
+                .andDo(document("post-get-happy",
+                        idPathParameter(),
+                        postResponseFields()));
+
+        mockMvc.perform(get("/posts/{id}", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.viewCount").value(2));
+    }
+
+    @Test
+    void get_by_id_returns_404_with_resource_not_found_when_id_missing() throws Exception {
+        mockMvc.perform(get("/posts/{id}", 99999L))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").exists())
+                .andExpect(jsonPath("$.path").value("/posts/99999"))
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andDo(document("post-get-not-found",
+                        idPathParameter(),
+                        errorResponseFields()));
+    }
+
+    @Test
+    void get_by_id_returns_404_for_negative_id() throws Exception {
+        mockMvc.perform(get("/posts/{id}", -1L))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
+                .andDo(document("post-get-negative-id",
+                        idPathParameter(),
+                        errorResponseFields()));
+    }
+
+    @Test
+    void get_by_id_returns_400_for_non_numeric_id() throws Exception {
+        mockMvc.perform(get("/posts/{id}", "abc"))
+                .andExpect(status().isBadRequest())
+                .andDo(document("post-get-non-numeric-id",
+                        idPathParameter()));
     }
 
     // ----- PUT /posts/{id} -----
@@ -250,18 +326,26 @@ class PostControllerE2ETest {
                 .andExpect(jsonPath("$.title").value("Updated"))
                 .andExpect(jsonPath("$.content").value("New body"))
                 .andExpect(jsonPath("$.author").value("alice"))
-                .andExpect(jsonPath("$.viewCount").value(0));
+                .andExpect(jsonPath("$.viewCount").value(0))
+                .andDo(document("post-update-happy",
+                        idPathParameter(),
+                        postUpdateRequestFields(),
+                        postResponseFields()));
     }
 
     @Test
     void put_by_id_returns_404_when_post_not_found() throws Exception {
         PostUpdateRequest req = new PostUpdateRequest("x", "y");
 
-        mockMvc.perform(put("/posts/99999")
+        mockMvc.perform(put("/posts/{id}", 99999L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
+                .andDo(document("post-update-not-found",
+                        idPathParameter(),
+                        postUpdateRequestFields(),
+                        errorResponseFields()));
     }
 
     @Test
@@ -274,7 +358,11 @@ class PostControllerE2ETest {
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.errors[*].field").value(hasItem("title")));
+                .andExpect(jsonPath("$.errors[*].field").value(hasItem("title")))
+                .andDo(document("post-update-missing-title",
+                        idPathParameter(),
+                        postUpdateRequestFields(),
+                        errorResponseFields()));
     }
 
     @Test
@@ -286,7 +374,11 @@ class PostControllerE2ETest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors[*].field").value(hasItem("title")));
+                .andExpect(jsonPath("$.errors[*].field").value(hasItem("title")))
+                .andDo(document("post-update-whitespace-title",
+                        idPathParameter(),
+                        postUpdateRequestFields(),
+                        errorResponseFields()));
     }
 
     @Test
@@ -298,7 +390,11 @@ class PostControllerE2ETest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors[*].field").value(hasItem("title")));
+                .andExpect(jsonPath("$.errors[*].field").value(hasItem("title")))
+                .andDo(document("post-update-oversized-title",
+                        idPathParameter(),
+                        postUpdateRequestFields(),
+                        errorResponseFields()));
     }
 
     @Test
@@ -310,7 +406,11 @@ class PostControllerE2ETest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors[*].field").value(hasItem("content")));
+                .andExpect(jsonPath("$.errors[*].field").value(hasItem("content")))
+                .andDo(document("post-update-missing-content",
+                        idPathParameter(),
+                        postUpdateRequestFields(),
+                        errorResponseFields()));
     }
 
     @Test
@@ -322,7 +422,11 @@ class PostControllerE2ETest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors[*].field").value(hasItem("content")));
+                .andExpect(jsonPath("$.errors[*].field").value(hasItem("content")))
+                .andDo(document("post-update-oversized-content",
+                        idPathParameter(),
+                        postUpdateRequestFields(),
+                        errorResponseFields()));
     }
 
     // ----- DELETE /posts/{id} (soft delete) -----
@@ -334,7 +438,9 @@ class PostControllerE2ETest {
 
         mockMvc.perform(delete("/posts/{id}", id))
                 .andExpect(status().isNoContent())
-                .andExpect(content().string(""));
+                .andExpect(content().string(""))
+                .andDo(document("post-delete-success",
+                        idPathParameter()));
 
         mockMvc.perform(get("/posts/{id}", id))
                 .andExpect(status().isNotFound())
@@ -343,9 +449,12 @@ class PostControllerE2ETest {
 
     @Test
     void delete_by_id_returns_404_when_post_not_found() throws Exception {
-        mockMvc.perform(delete("/posts/99999"))
+        mockMvc.perform(delete("/posts/{id}", 99999L))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
+                .andDo(document("post-delete-not-found",
+                        idPathParameter(),
+                        errorResponseFields()));
     }
 
     @Test
@@ -356,7 +465,10 @@ class PostControllerE2ETest {
                 .andExpect(status().isNoContent());
         mockMvc.perform(delete("/posts/{id}", saved.getId()))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
+                .andDo(document("post-delete-twice",
+                        idPathParameter(),
+                        errorResponseFields()));
     }
 
     @Test
@@ -371,8 +483,13 @@ class PostControllerE2ETest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content", hasSize(1)))
-                .andExpect(jsonPath("$.content[0].title").value("Keep"));
+                .andExpect(jsonPath("$.content[0].title").value("Keep"))
+                .andDo(document("post-delete-soft-excluded-from-list",
+                        paginationQueryParameters(),
+                        pageResponseFields()));
     }
+
+    // ----- Test helpers -----
 
     private ResultActions perform(PostCreateRequest request) throws Exception {
         return mockMvc.perform(post("/posts")
@@ -387,5 +504,82 @@ class PostControllerE2ETest {
                 .andExpect(jsonPath("$.message").exists())
                 .andExpect(jsonPath("$.path").value("/posts"))
                 .andExpect(jsonPath("$.timestamp").exists());
+    }
+
+    // ----- REST Docs snippet helpers (shared field/parameter descriptors) -----
+
+    private static RequestFieldsSnippet postCreateRequestFields() {
+        return requestFields(
+                fieldWithPath("author").description("작성자 이름 (1-30자, 필수)"),
+                fieldWithPath("title").description("제목 (1-80자, 필수)"),
+                fieldWithPath("content").description("내용 (1-5000자, 필수)")
+        );
+    }
+
+    private static RequestFieldsSnippet postUpdateRequestFields() {
+        return requestFields(
+                fieldWithPath("title").description("제목 (1-80자, 필수)"),
+                fieldWithPath("content").description("내용 (1-5000자, 필수)")
+        );
+    }
+
+    private static ResponseFieldsSnippet postResponseFields() {
+        return responseFields(
+                fieldWithPath("id").description("Post의 고유 ID (BIGSERIAL)"),
+                fieldWithPath("author").description("작성자"),
+                fieldWithPath("title").description("제목"),
+                fieldWithPath("content").description("내용"),
+                fieldWithPath("createdAt").description("생성 시각 (ISO-8601 UTC)"),
+                fieldWithPath("updatedAt").description("수정 시각 (ISO-8601 UTC)"),
+                fieldWithPath("viewCount").description("조회수")
+        );
+    }
+
+    private static ResponseFieldsSnippet pageResponseFields() {
+        return responseFields(
+                fieldWithPath("content").description("Post 배열"),
+                fieldWithPath("content[].id").type(JsonFieldType.NUMBER).description("Post의 고유 ID").optional(),
+                fieldWithPath("content[].author").type(JsonFieldType.STRING).description("작성자").optional(),
+                fieldWithPath("content[].title").type(JsonFieldType.STRING).description("제목").optional(),
+                fieldWithPath("content[].content").type(JsonFieldType.STRING).description("내용").optional(),
+                fieldWithPath("content[].createdAt").type(JsonFieldType.STRING).description("생성 시각 (ISO-8601 UTC)").optional(),
+                fieldWithPath("content[].updatedAt").type(JsonFieldType.STRING).description("수정 시각 (ISO-8601 UTC)").optional(),
+                fieldWithPath("content[].viewCount").type(JsonFieldType.NUMBER).description("조회수").optional(),
+                fieldWithPath("page").description("현재 페이지 번호 (0-indexed)"),
+                fieldWithPath("size").description("페이지 크기"),
+                fieldWithPath("totalElements").description("전체 항목 수"),
+                fieldWithPath("totalPages").description("전체 페이지 수")
+        );
+    }
+
+    private static QueryParametersSnippet paginationQueryParameters() {
+        return queryParameters(
+                parameterWithName("page").description("페이지 번호 (0 이상, 기본 0)").optional(),
+                parameterWithName("size").description("페이지 크기 (1-100, 기본 20)").optional()
+        );
+    }
+
+    private static PathParametersSnippet idPathParameter() {
+        return pathParameters(
+                parameterWithName("id").description("Post의 고유 ID")
+        );
+    }
+
+    private static ResponseHeadersSnippet locationHeader() {
+        return responseHeaders(
+                headerWithName("Location").description("생성된 자원 URI (/posts/{id})")
+        );
+    }
+
+    private static ResponseFieldsSnippet errorResponseFields() {
+        return responseFields(
+                fieldWithPath("code").description("에러 코드 (ErrorCode enum name)"),
+                fieldWithPath("message").description("에러 메시지"),
+                fieldWithPath("path").description("요청 path"),
+                fieldWithPath("timestamp").description("발생 시각 (ISO-8601 UTC)"),
+                fieldWithPath("errors").type(JsonFieldType.ARRAY).description("필드별 에러 목록 (검증 실패 시만)").optional(),
+                fieldWithPath("errors[].field").type(JsonFieldType.STRING).description("위반 필드").optional(),
+                fieldWithPath("errors[].message").type(JsonFieldType.STRING).description("위반 사유").optional()
+        );
     }
 }

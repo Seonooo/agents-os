@@ -2,6 +2,7 @@ plugins {
     java
     id("org.springframework.boot") version "4.0.6"
     id("io.spring.dependency-management") version "1.1.7"
+    id("org.asciidoctor.jvm.convert") version "4.0.5"
 }
 
 group = "com.example"
@@ -41,4 +42,10 @@ dependencies {
 tasks.withType<Test> {
     useJUnitPlatform()
     outputs.dir(project.extra["snippetsDir"]!!)
+}
+
+tasks.asciidoctor {
+    setSourceDir(file("src/main/asciidoc"))
+    inputs.dir(project.extra["snippetsDir"]!!)
+    dependsOn(tasks.test)
 }
