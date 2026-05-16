@@ -1,0 +1,121 @@
+{
+  "batch_id": "2026-05-16-post-update-delete",
+  "purpose": "Implement PUT /posts/{id} (update title/content) and DELETE /posts/{id} (soft delete) per the reviewed Task Context. Demonstrates discipline of writing batch plan even when chat planning already covered the same ground (retro action item).",
+  "rationale": [
+    "Task Context (.agent-os/tasks/2026-05-16-post-update-delete.md) defines the contract.",
+    "Review (.review.md) records the Major correction (hard -> soft delete) and its cascading effects.",
+    "tdd-endpoint Skill defines the 4-round structure used here."
+  ],
+  "design_principles": {
+    "auto_loaded": false,
+    "scope": "per-batch operational plan, persisted alongside the implementation commit as audit record",
+    "ownership": "AI-drafted from reviewed Task Context, frozen at execution time"
+  },
+  "rounds": [
+    {
+      "round": "A",
+      "name": "Domain + Service unit",
+      "operations": [
+        {
+          "op": "write",
+          "path": "src/main/resources/db/migration/V2__add_posts_deleted_at.sql",
+          "content_summary": "ALTER TABLE posts ADD COLUMN deleted_at TIMESTAMP WITH TIME ZONE; (no index for MVP)"
+        },
+        {
+          "op": "edit",
+          "path": "src/main/java/com/example/board/post/Post.java",
+          "content_summary": "Add @SQLRestriction(\"deleted_at IS NULL\") at class level; add private Instant deletedAt field; add getter; add update(title, content, updatedAt) and delete(Instant) domain methods. Existing constructors/getters/withId unchanged."
+        },
+        {
+          "op": "edit",
+          "path": "src/main/java/com/example/board/post/PostRepository.java",
+          "content_summary": "Update incrementViewCount @Query to add AND p.deletedAt IS NULL (@Modifying @Query is not affected by @SQLRestriction)."
+        },
+        {
+          "op": "write",
+          "path": "src/main/java/com/example/board/post/PostUpdateRequest.java",
+          "content_summary": "New record (title, content) with @NotBlank @Size(max=80)/@Size(max=5000)."
+        },
+        {
+          "op": "edit",
+          "path": "src/main/java/com/example/board/post/PostService.java",
+          "content_summary": "Add update(Long id, PostUpdateRequest) and delete(Long id), both @Transactional (non-readOnly). Use findById().orElseThrow(PostNotFoundException::new) then post.update/post.delete then dirty-checking flush."
+        },
+        {
+          "op": "edit",
+          "path": "src/test/java/com/example/board/post/PostServiceTest.java",
+          "content_summary": "Add 4 unit tests: update happy/not-found, delete happy/not-found. Verify post.getDeletedAt() and post.getTitle() after method calls."
+        }
+      ],
+      "expected_files_changed": 6,
+      "verification": "./gradlew test --tests com.example.board.post.PostServiceTest"
+    },
+    {
+      "round": "B",
+      "name": "PUT/DELETE E2E happy + 404 reuse",
+      "operations": [
+        {
+          "op": "edit",
+          "path": "src/main/java/com/example/board/post/PostController.java",
+          "content_summary": "Add @PutMapping(\"/{id}\") update(...) returning PostResponse and @DeleteMapping(\"/{id}\") with @ResponseStatus(NO_CONTENT) returning void. PathVariable + @Valid @RequestBody PostUpdateRequest."
+        },
+        {
+          "op": "edit",
+          "path": "src/test/java/com/example/board/post/PostControllerE2ETest.java",
+          "content_summary": "Add E2E tests: put happy (200 + updated body), put 404, put 400 validation (1 sample), delete 204 + soft-delete verification (subsequent GET 404), delete 404, delete twice (1st 204, 2nd 404), soft-deleted excluded from list (GET totalElements decremented)."
+        }
+      ],
+      "expected_files_changed": 2,
+      "verification": "./gradlew test --tests com.example.board.post.PostControllerE2ETest"
+    },
+    {
+      "round": "C",
+      "name": "Validation coverage (PUT)",
+      "operations": [
+        {
+          "op": "edit",
+          "path": "src/test/java/com/example/board/post/PostControllerE2ETest.java",
+          "content_summary": "Add: put with missing title, missing content, whitespace-only title, oversized title (81 chars), oversized content (5001 chars). Reuse expectValidationFailure() helper."
+        }
+      ],
+      "expected_files_changed": 1,
+      "verification": "./gradlew test --tests com.example.board.post.PostControllerE2ETest"
+    },
+    {
+      "round": "D",
+      "name": "Refactor + full regression + tracker + commit",
+      "operations": [
+        {
+          "op": "verify",
+          "path": "./gradlew test",
+          "content_summary": "Full regression: all 23 prior + new = ~33-35 tests must be green."
+        },
+        {
+          "op": "edit",
+          "path": "docs/agents/skill-candidates.md",
+          "content_summary": "Bump 'Domain exception -> @ExceptionHandler -> ErrorResponse mapping' from count 1 to count 2 (reuse). Decide: extract Skill now (threshold met) vs hold (pattern was reused without modification — extraction value unclear). Add new monitoring entry for @SQLRestriction soft delete pattern (count 1)."
+        },
+        {
+          "op": "edit",
+          "path": ".claude/rules/conventions.md",
+          "content_summary": "Optionally add: '@SQLRestriction for entity-level soft delete; @Modifying @Query needs explicit filter.' (only if pattern is expected to recur)"
+        }
+      ],
+      "expected_files_changed": "2-3 + commit"
+    }
+  ],
+  "global_verification": [
+    "All 23 prior tests still green (regression).",
+    "V2 Flyway migration applied cleanly at startup (visible in logs).",
+    "Soft-deleted post is invisible to GET, GET-list, GET-by-id, PUT, DELETE.",
+    "viewCount increment skips soft-deleted rows.",
+    "harness.md walked explicitly before commit (retro action item)."
+  ],
+  "parallel_execution_strategy": {
+    "Round A": "5 of 6 operations are independent file writes/edits to different files -> single function_calls block with 5 invokes. Test file edits can also be parallel.",
+    "Round B": "2 edits to different files -> single block, 2 invokes.",
+    "Round C": "1 edit -> sequential trivially.",
+    "Round D": "1 verify (Bash) then sequential edits then commit."
+  },
+  "commit_message_summary": "Add PUT/DELETE /posts/{id} with soft delete + @SQLRestriction"
+}

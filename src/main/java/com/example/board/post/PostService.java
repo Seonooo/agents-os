@@ -47,4 +47,19 @@ public class PostService {
                 .orElseThrow(() -> new PostNotFoundException(id));
         return PostResponse.from(post);
     }
+
+    @Transactional
+    public PostResponse update(Long id, PostUpdateRequest request) {
+        Post post = postRepository.findById(id)
+                .orElseThrow(() -> new PostNotFoundException(id));
+        post.update(request.title(), request.content(), clock.instant());
+        return PostResponse.from(post);
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        Post post = postRepository.findById(id)
+                .orElseThrow(() -> new PostNotFoundException(id));
+        post.delete(clock.instant());
+    }
 }

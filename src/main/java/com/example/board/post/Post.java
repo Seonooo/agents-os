@@ -6,11 +6,13 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.time.Instant;
 
 @Entity
 @Table(name = "posts")
+@SQLRestriction("deleted_at IS NULL")
 public class Post {
 
     @Id
@@ -34,6 +36,9 @@ public class Post {
 
     @Column(nullable = false)
     private long viewCount;
+
+    @Column
+    private Instant deletedAt;
 
     protected Post() {
     }
@@ -63,6 +68,16 @@ public class Post {
                 this.createdAt, this.updatedAt, this.viewCount);
     }
 
+    public void update(String title, String content, Instant updatedAt) {
+        this.title = title;
+        this.content = content;
+        this.updatedAt = updatedAt;
+    }
+
+    public void delete(Instant deletedAt) {
+        this.deletedAt = deletedAt;
+    }
+
     public Long getId() {
         return id;
     }
@@ -89,5 +104,9 @@ public class Post {
 
     public long getViewCount() {
         return viewCount;
+    }
+
+    public Instant getDeletedAt() {
+        return deletedAt;
     }
 }

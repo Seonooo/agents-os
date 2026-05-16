@@ -23,6 +23,10 @@
 | Testcontainers Postgres seed-then-GET test data setup | 2 | 2026-05-16 | 🟡 candidate (mostly absorbed in `tdd-endpoint` Round B) | — |
 | Atomic counter via `@Modifying @Query` + `clearAutomatically` | 1 | 2026-05-16 | ⚪ monitoring | — |
 | Domain exception → `@ExceptionHandler` → `ErrorResponse` mapping | 1 | 2026-05-16 | ⚪ monitoring | — |
+| Soft delete via `@SQLRestriction` + `@Modifying @Query` explicit filter | 1 | 2026-05-16 | ⚪ monitoring | — |
+| Mutable domain methods on JPA entity (`update`, `delete`) instead of setters | 1 | 2026-05-16 | ⚪ monitoring | — |
+| Flyway V2+ migration (additive ALTER without index) | 1 | 2026-05-16 | ⚪ monitoring | — |
+| Reusing existing domain exception across new endpoints (no new exception class) | 1 | 2026-05-16 | ⚪ monitoring | — |
 
 ## Detailed history
 
@@ -83,8 +87,36 @@ The "fill template → AI summarizes + asks → human corrects → record in `.r
 
 → Watch for second occurrence (likes, replies, view-by-day counter, etc.). Extract at count=2.
 
-### Domain exception → `@ExceptionHandler` → `ErrorResponse` mapping
+### Soft delete via `@SQLRestriction` + `@Modifying @Query` explicit filter
 **Count: 1 / Status: ⚪ monitoring**
+
+- 2026-05-16 — `Post` entity gets `@SQLRestriction("deleted_at IS NULL")` for auto-filtering all entity reads. `PostRepository.incrementViewCount` HQL `@Modifying @Query` adds `AND p.deletedAt IS NULL` manually (because `@SQLRestriction` does NOT apply to HQL/JPQL modifying queries). DELETE endpoint becomes `findById -> post.delete(now)` (dirty checking sets `deleted_at`). V2 Flyway migration adds nullable column.
+
+→ Watch for second domain needing soft delete (Comment, User, etc.). Extract at count=2 as a comprehensive soft-delete Skill (entity annotation + repository query rules + DELETE service pattern + V2 migration template).
+
+### Mutable domain methods on JPA entity instead of setters
+**Count: 1 / Status: ⚪ monitoring**
+
+- 2026-05-16 — `Post.update(title, content, updatedAt)` and `Post.delete(deletedAt)` added as domain methods (no setters exposed). Used by `PostService.update/delete` via dirty checking (no explicit `repo.save`).
+
+→ Watch for second entity needing mutability. Extract at count=2 as a Skill on "JPA entity domain method discipline".
+
+### Flyway V2+ migration (additive ALTER)
+**Count: 1 / Status: ⚪ monitoring**
+
+- 2026-05-16 — `V2__add_posts_deleted_at.sql` adds a nullable column. Notable: no index added (kept minimal per Hard rules — only PK guaranteed; non-PK indexes need explicit justification later).
+
+→ Watch for second migration to see if a Flyway-migration Skill (template + verification checklist) is worth extracting.
+
+### Reusing existing domain exception across new endpoints
+**Count: 1 / Status: ⚪ monitoring**
+
+- 2026-05-16 — `PostNotFoundException` + `RESOURCE_NOT_FOUND` originally introduced for GET-by-id (2026-05-16 earlier), reused unchanged by PUT and DELETE endpoints in the same day. Pattern: keep one exception class per "missing resource" semantic, attach multiple call sites — do NOT create per-endpoint exception subclasses.
+
+→ Watch for second reuse case (next domain). Extract at count=2 as a Skill on "exception reuse vs subclassing decision tree".
+
+### Domain exception → `@ExceptionHandler` → `ErrorResponse` mapping
+**Count: 1 / Status: ⚪ monitoring** (this entry tracks CREATION of new exception+handler+code; reuse is tracked separately above)
 
 - 2026-05-16 — `PostNotFoundException` → `handlePostNotFound` in `RequestValidationExceptionHandler` → `ErrorResponse(code = RESOURCE_NOT_FOUND, ...)`. Pattern: custom exception class + `@ExceptionHandler(X.class)` method on existing advice + new `ErrorCode` enum value.
 

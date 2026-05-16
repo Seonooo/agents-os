@@ -8,6 +8,6 @@ import org.springframework.data.repository.query.Param;
 public interface PostRepository extends JpaRepository<Post, Long> {
 
     @Modifying(clearAutomatically = true)
-    @Query("UPDATE Post p SET p.viewCount = p.viewCount + 1 WHERE p.id = :id")
+    @Query("UPDATE Post p SET p.viewCount = p.viewCount + 1 WHERE p.id = :id AND p.deletedAt IS NULL")
     int incrementViewCount(@Param("id") Long id);
 }

@@ -132,4 +132,52 @@ class PostServiceTest {
 
         verify(postRepository, never()).findById(any());
     }
+
+    @Test
+    void update_modifies_title_and_content_and_updatedAt_preserving_other_fields() {
+        Long id = 42L;
+        Post existing = new Post("alice", "Old", "Old body", FIXED_NOW).withId(id);
+        when(postRepository.findById(id)).thenReturn(Optional.of(existing));
+
+        PostResponse response = postService.update(id, new PostUpdateRequest("New", "New body"));
+
+        assertThat(existing.getTitle()).isEqualTo("New");
+        assertThat(existing.getContent()).isEqualTo("New body");
+        assertThat(existing.getUpdatedAt()).isEqualTo(FIXED_NOW);
+        assertThat(existing.getAuthor()).isEqualTo("alice");
+
+        assertThat(response.id()).isEqualTo(id);
+        assertThat(response.title()).isEqualTo("New");
+        assertThat(response.content()).isEqualTo("New body");
+        assertThat(response.author()).isEqualTo("alice");
+    }
+
+    @Test
+    void update_throws_PostNotFoundException_when_id_missing() {
+        Long id = 99L;
+        when(postRepository.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> postService.update(id, new PostUpdateRequest("a", "b")))
+                .isInstanceOf(PostNotFoundException.class);
+    }
+
+    @Test
+    void delete_sets_deletedAt_on_found_post() {
+        Long id = 42L;
+        Post existing = new Post("alice", "Hello", "World", FIXED_NOW).withId(id);
+        when(postRepository.findById(id)).thenReturn(Optional.of(existing));
+
+        postService.delete(id);
+
+        assertThat(existing.getDeletedAt()).isEqualTo(FIXED_NOW);
+    }
+
+    @Test
+    void delete_throws_PostNotFoundException_when_id_missing() {
+        Long id = 99L;
+        when(postRepository.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> postService.delete(id))
+                .isInstanceOf(PostNotFoundException.class);
+    }
 }

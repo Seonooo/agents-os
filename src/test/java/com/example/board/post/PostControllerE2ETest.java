@@ -18,8 +18,11 @@ import java.util.List;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.matchesPattern;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -229,6 +232,146 @@ class PostControllerE2ETest {
                 .andExpect(jsonPath("$.size").value(1))
                 .andExpect(jsonPath("$.totalElements").value(2))
                 .andExpect(jsonPath("$.totalPages").value(2));
+    }
+
+    // ----- PUT /posts/{id} -----
+
+    @Test
+    void put_by_id_returns_200_with_updated_title_and_content() throws Exception {
+        Post saved = postRepository.save(new Post("alice", "Original", "Body", Instant.parse("2026-05-15T10:00:00Z")));
+        Long id = saved.getId();
+        PostUpdateRequest req = new PostUpdateRequest("Updated", "New body");
+
+        mockMvc.perform(put("/posts/{id}", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id))
+                .andExpect(jsonPath("$.title").value("Updated"))
+                .andExpect(jsonPath("$.content").value("New body"))
+                .andExpect(jsonPath("$.author").value("alice"))
+                .andExpect(jsonPath("$.viewCount").value(0));
+    }
+
+    @Test
+    void put_by_id_returns_404_when_post_not_found() throws Exception {
+        PostUpdateRequest req = new PostUpdateRequest("x", "y");
+
+        mockMvc.perform(put("/posts/99999")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
+    void put_with_missing_title_returns_400() throws Exception {
+        Post saved = postRepository.save(new Post("alice", "Original", "Body", Instant.parse("2026-05-15T10:00:00Z")));
+        PostUpdateRequest req = new PostUpdateRequest(null, "only content");
+
+        mockMvc.perform(put("/posts/{id}", saved.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors[*].field").value(hasItem("title")));
+    }
+
+    @Test
+    void put_with_whitespace_only_title_returns_400() throws Exception {
+        Post saved = postRepository.save(new Post("alice", "Original", "Body", Instant.parse("2026-05-15T10:00:00Z")));
+        PostUpdateRequest req = new PostUpdateRequest("   ", "x");
+
+        mockMvc.perform(put("/posts/{id}", saved.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[*].field").value(hasItem("title")));
+    }
+
+    @Test
+    void put_with_oversized_title_returns_400() throws Exception {
+        Post saved = postRepository.save(new Post("alice", "Original", "Body", Instant.parse("2026-05-15T10:00:00Z")));
+        PostUpdateRequest req = new PostUpdateRequest("t".repeat(81), "x");
+
+        mockMvc.perform(put("/posts/{id}", saved.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[*].field").value(hasItem("title")));
+    }
+
+    @Test
+    void put_with_missing_content_returns_400() throws Exception {
+        Post saved = postRepository.save(new Post("alice", "Original", "Body", Instant.parse("2026-05-15T10:00:00Z")));
+        PostUpdateRequest req = new PostUpdateRequest("ok", null);
+
+        mockMvc.perform(put("/posts/{id}", saved.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[*].field").value(hasItem("content")));
+    }
+
+    @Test
+    void put_with_oversized_content_returns_400() throws Exception {
+        Post saved = postRepository.save(new Post("alice", "Original", "Body", Instant.parse("2026-05-15T10:00:00Z")));
+        PostUpdateRequest req = new PostUpdateRequest("ok", "c".repeat(5001));
+
+        mockMvc.perform(put("/posts/{id}", saved.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[*].field").value(hasItem("content")));
+    }
+
+    // ----- DELETE /posts/{id} (soft delete) -----
+
+    @Test
+    void delete_by_id_returns_204_and_soft_deletes_post() throws Exception {
+        Post saved = postRepository.save(new Post("alice", "X", "Y", Instant.parse("2026-05-15T10:00:00Z")));
+        Long id = saved.getId();
+
+        mockMvc.perform(delete("/posts/{id}", id))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+
+        mockMvc.perform(get("/posts/{id}", id))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
+    void delete_by_id_returns_404_when_post_not_found() throws Exception {
+        mockMvc.perform(delete("/posts/99999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
+    void delete_same_post_twice_returns_404_on_second_call() throws Exception {
+        Post saved = postRepository.save(new Post("alice", "X", "Y", Instant.parse("2026-05-15T10:00:00Z")));
+
+        mockMvc.perform(delete("/posts/{id}", saved.getId()))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(delete("/posts/{id}", saved.getId()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
+    void soft_deleted_post_does_not_appear_in_list() throws Exception {
+        Post p1 = postRepository.save(new Post("a", "Keep", "1", Instant.parse("2026-05-15T10:00:00Z")));
+        Post p2 = postRepository.save(new Post("b", "Delete me", "2", Instant.parse("2026-05-15T11:00:00Z")));
+
+        mockMvc.perform(delete("/posts/{id}", p2.getId()))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/posts"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].title").value("Keep"));
     }
 
     private ResultActions perform(PostCreateRequest request) throws Exception {
