@@ -256,6 +256,219 @@ class PostControllerE2ETest {
                         pageResponseFields()));
     }
 
+    // ----- GET /posts?q= (search by title) -----
+
+    @Test
+    void get_with_query_filters_by_title_case_insensitive() throws Exception {
+        postRepository.saveAll(List.of(
+                new Post("alice", "Spring Boot 4", "release", Instant.parse("2026-05-15T10:00:00Z")),
+                new Post("bob", "Hello World", "intro", Instant.parse("2026-05-15T11:00:00Z")),
+                new Post("carol", "Quarkus Notes", "framework", Instant.parse("2026-05-15T12:00:00Z"))
+        ));
+
+        mockMvc.perform(get("/posts").param("q", "spring"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].title").value("Spring Boot 4"))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1))
+                .andDo(document("post-list-search-match",
+                        searchQueryParameters(),
+                        pageResponseFields()));
+    }
+
+    @Test
+    void get_with_query_returns_empty_page_when_no_match() throws Exception {
+        postRepository.save(new Post("alice", "Spring", "x", Instant.parse("2026-05-15T10:00:00Z")));
+
+        mockMvc.perform(get("/posts").param("q", "zzz"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(0)))
+                .andExpect(jsonPath("$.totalElements").value(0))
+                .andExpect(jsonPath("$.totalPages").value(0))
+                .andDo(document("post-list-search-no-match",
+                        searchQueryParameters(),
+                        pageResponseFields()));
+    }
+
+    @Test
+    void get_with_empty_query_returns_all_posts_like_unfiltered() throws Exception {
+        postRepository.saveAll(List.of(
+                new Post("alice", "First", "Body1", Instant.parse("2026-05-15T10:00:00Z")),
+                new Post("bob", "Second", "Body2", Instant.parse("2026-05-15T11:00:00Z"))
+        ));
+
+        mockMvc.perform(get("/posts").param("q", ""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(jsonPath("$.totalElements").value(2));
+    }
+
+    @Test
+    void get_with_query_does_not_match_content_only_title() throws Exception {
+        postRepository.saveAll(List.of(
+                new Post("alice", "Title A", "the word spring appears in content", Instant.parse("2026-05-15T10:00:00Z")),
+                new Post("bob", "Spring Title", "unrelated content", Instant.parse("2026-05-15T11:00:00Z"))
+        ));
+
+        mockMvc.perform(get("/posts").param("q", "spring"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].title").value("Spring Title"))
+                .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    @Test
+    void get_with_oversized_query_returns_400() throws Exception {
+        mockMvc.perform(get("/posts").param("q", "a".repeat(101)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors[*].field").value(hasItem("q")))
+                .andDo(document("post-list-search-oversized-q",
+                        searchQueryParameters(),
+                        errorResponseFields()));
+    }
+
+    @Test
+    void get_with_q_at_exact_max_length_succeeds() throws Exception {
+        // @Size(max=100) boundary: exactly 100 chars must pass. Guards off-by-one regressions.
+        mockMvc.perform(get("/posts").param("q", "a".repeat(100)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(0)));
+    }
+
+    @Test
+    void get_with_korean_query_matches_korean_title_locks_in_current_behavior() throws Exception {
+        // Locks in: Korean substring search works (Korean has no case; LOWER is a no-op).
+        // Task Context Q-F decided "영문만 case-insensitive 가정" — this test documents the
+        // de facto Korean behavior so a future contributor sees it before changing.
+        postRepository.saveAll(List.of(
+                new Post("alice", "한국어 게시판", "x", Instant.parse("2026-05-15T10:00:00Z")),
+                new Post("bob", "English Title", "y", Instant.parse("2026-05-15T11:00:00Z"))
+        ));
+
+        mockMvc.perform(get("/posts").param("q", "한국어"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].title").value("한국어 게시판"))
+                .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    @Test
+    void get_with_sql_injection_attempt_q_is_treated_as_literal_string() throws Exception {
+        // JPA parameter binding ensures user input is bound as a parameter, never concatenated.
+        // Locks in: an attacker-style q returns no matches (no title contains that literal),
+        // and crucially does NOT return all posts via SQL truthy-tautology.
+        postRepository.saveAll(List.of(
+                new Post("alice", "Safe Title", "x", Instant.parse("2026-05-15T10:00:00Z")),
+                new Post("bob", "Another Post", "y", Instant.parse("2026-05-15T11:00:00Z"))
+        ));
+
+        mockMvc.perform(get("/posts").param("q", "' OR 1=1 --"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(0)))
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    void get_with_q_and_no_size_uses_default_size_20_capping_per_request_payload() throws Exception {
+        // Full-scan guardrail: ?q= without ?size still caps per-request payload at default 20.
+        // (DB still scans the full table for LIKE matching — index introduction is out of MVP scope —
+        // but client-bound payload is bounded.)
+        List<Post> manyMatches = new java.util.ArrayList<>();
+        for (int i = 0; i < 25; i++) {
+            String minute = String.format("%02d", i);
+            manyMatches.add(new Post("a", "spring " + i, "x",
+                    Instant.parse("2026-05-15T10:" + minute + ":00Z")));
+        }
+        postRepository.saveAll(manyMatches);
+
+        mockMvc.perform(get("/posts").param("q", "spring"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.size").value(20))
+                .andExpect(jsonPath("$.content", hasSize(20)))
+                .andExpect(jsonPath("$.totalElements").value(25))
+                .andExpect(jsonPath("$.totalPages").value(2));
+    }
+
+    @Test
+    void get_with_query_paginates_filtered_results() throws Exception {
+        postRepository.saveAll(List.of(
+                new Post("a", "Spring 1", "x", Instant.parse("2026-05-15T10:00:00Z")),
+                new Post("b", "Spring 2", "y", Instant.parse("2026-05-15T11:00:00Z")),
+                new Post("c", "Spring 3", "z", Instant.parse("2026-05-15T12:00:00Z")),
+                new Post("d", "Quarkus", "irrelevant", Instant.parse("2026-05-15T13:00:00Z"))
+        ));
+
+        mockMvc.perform(get("/posts").param("q", "spring").param("page", "1").param("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].title").value("Spring 1"))
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.size").value(2))
+                .andExpect(jsonPath("$.totalElements").value(3))
+                .andExpect(jsonPath("$.totalPages").value(2));
+    }
+
+    @Test
+    void get_with_query_orders_matches_by_created_at_desc_id_desc() throws Exception {
+        postRepository.saveAll(List.of(
+                new Post("a", "Spring oldest", "x", Instant.parse("2026-05-15T10:00:00Z")),
+                new Post("b", "Spring middle", "y", Instant.parse("2026-05-15T11:00:00Z")),
+                new Post("c", "Spring newest", "z", Instant.parse("2026-05-15T12:00:00Z"))
+        ));
+
+        mockMvc.perform(get("/posts").param("q", "spring"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(3)))
+                .andExpect(jsonPath("$.content[0].title").value("Spring newest"))
+                .andExpect(jsonPath("$.content[1].title").value("Spring middle"))
+                .andExpect(jsonPath("$.content[2].title").value("Spring oldest"));
+    }
+
+    @Test
+    void get_with_whitespace_only_query_returns_all_posts_like_unfiltered() throws Exception {
+        postRepository.saveAll(List.of(
+                new Post("a", "First", "x", Instant.parse("2026-05-15T10:00:00Z")),
+                new Post("b", "Second", "y", Instant.parse("2026-05-15T11:00:00Z"))
+        ));
+
+        mockMvc.perform(get("/posts").param("q", "   "))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(jsonPath("$.totalElements").value(2));
+    }
+
+    @Test
+    void get_with_sql_wildcard_q_is_escaped_by_spring_data_and_matches_literal() throws Exception {
+        // Spring Data JPA's `Containing` keyword auto-escapes %, _, \ so they are matched literally,
+        // NOT as SQL LIKE wildcards. We discovered this at implementation time — Q-B "escape drop"
+        // turned out to be moot: framework already handles it. This test locks in that contract.
+        Post withPct = postRepository.save(new Post("a", "50% off sale", "x", Instant.parse("2026-05-15T11:00:00Z")));
+        postRepository.save(new Post("b", "alpha", "y", Instant.parse("2026-05-15T10:00:00Z")));
+
+        mockMvc.perform(get("/posts").param("q", "%"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].id").value(withPct.getId()))
+                .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    @Test
+    void get_with_query_excludes_soft_deleted_posts() throws Exception {
+        Post keep = postRepository.save(new Post("alice", "Spring Boot", "x", Instant.parse("2026-05-15T10:00:00Z")));
+        Post drop = postRepository.save(new Post("bob", "Spring Cloud", "y", Instant.parse("2026-05-15T11:00:00Z")));
+
+        mockMvc.perform(delete("/posts/{id}", drop.getId()))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/posts").param("q", "spring"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].id").value(keep.getId()))
+                .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
     // ----- GET /posts/{id} -----
 
     @Test
@@ -556,6 +769,14 @@ class PostControllerE2ETest {
         return queryParameters(
                 parameterWithName("page").description("페이지 번호 (0 이상, 기본 0)").optional(),
                 parameterWithName("size").description("페이지 크기 (1-100, 기본 20)").optional()
+        );
+    }
+
+    private static QueryParametersSnippet searchQueryParameters() {
+        return queryParameters(
+                parameterWithName("page").description("페이지 번호 (0 이상, 기본 0)").optional(),
+                parameterWithName("size").description("페이지 크기 (1-100, 기본 20)").optional(),
+                parameterWithName("q").description("title 검색어 (1-100자, case-insensitive partial). 미지정·빈 문자열이면 전체 목록.").optional()
         );
     }
 

@@ -22,6 +22,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -79,7 +80,7 @@ class PostServiceTest {
         Page<Post> repoPage = new PageImpl<>(List.of(p2, p1), PageRequest.of(0, 20), 2L);
         when(postRepository.findAll(any(Pageable.class))).thenReturn(repoPage);
 
-        PageResponse<PostResponse> result = postService.list(0, 20);
+        PageResponse<PostResponse> result = postService.list(0, 20, null);
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         verify(postRepository).findAll(pageableCaptor.capture());
@@ -99,6 +100,40 @@ class PostServiceTest {
         assertThat(result.size()).isEqualTo(20);
         assertThat(result.totalElements()).isEqualTo(2L);
         assertThat(result.totalPages()).isEqualTo(1);
+    }
+
+    @Test
+    void list_with_blank_query_delegates_to_findAll_not_search() {
+        Page<Post> repoPage = new PageImpl<>(List.of(), PageRequest.of(0, 20), 0L);
+        when(postRepository.findAll(any(Pageable.class))).thenReturn(repoPage);
+
+        postService.list(0, 20, "   ");
+
+        verify(postRepository).findAll(any(Pageable.class));
+        verify(postRepository, never()).findByTitleContainingIgnoreCase(any(), any(Pageable.class));
+    }
+
+    @Test
+    void list_with_query_calls_findByTitleContainingIgnoreCase_with_fixed_sort_and_maps() {
+        Post matching = new Post("alice", "Spring Boot 4", "irrelevant body", FIXED_NOW).withId(7L);
+        Page<Post> repoPage = new PageImpl<>(List.of(matching), PageRequest.of(0, 20), 1L);
+        when(postRepository.findByTitleContainingIgnoreCase(eq("spring"), any(Pageable.class)))
+                .thenReturn(repoPage);
+
+        PageResponse<PostResponse> result = postService.list(0, 20, "spring");
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(postRepository).findByTitleContainingIgnoreCase(eq("spring"), pageableCaptor.capture());
+        Pageable used = pageableCaptor.getValue();
+        assertThat(used.getSort())
+                .isEqualTo(Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
+
+        verify(postRepository, never()).findAll(any(Pageable.class));
+
+        assertThat(result.content())
+                .extracting(PostResponse::id, PostResponse::title)
+                .containsExactly(org.assertj.core.api.Assertions.tuple(7L, "Spring Boot 4"));
+        assertThat(result.totalElements()).isEqualTo(1L);
     }
 
     @Test

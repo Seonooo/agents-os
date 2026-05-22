@@ -31,10 +31,12 @@ public class PostService {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<PostResponse> list(int page, int size) {
+    public PageResponse<PostResponse> list(int page, int size, String q) {
         Pageable pageable = PageRequest.of(page, size, LIST_SORT);
-        Page<PostResponse> mapped = postRepository.findAll(pageable).map(PostResponse::from);
-        return PageResponse.from(mapped);
+        Page<Post> repoPage = (q == null || q.isBlank())
+                ? postRepository.findAll(pageable)
+                : postRepository.findByTitleContainingIgnoreCase(q, pageable);
+        return PageResponse.from(repoPage.map(PostResponse::from));
     }
 
     @Transactional
