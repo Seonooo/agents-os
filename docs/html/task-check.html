@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Task Check — AI 산출물 검수 뷰</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0e0f0d;--ink:#e8e6dd;--ink-dim:#9a9888;--line:#2c2e28;
+    --acid:#c6f04a;--acid-dim:#8aa536;--rust:#d9663f;--rust-dim:#a8543a;
+    --paper:#1a1c18;--paper2:#202320;--code:#13150f;
+    --green:#7ab83a;--yellow:#d9b03a;--red:#d9663f;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans KR',sans-serif;font-weight:300;line-height:1.7;-webkit-font-smoothing:antialiased}
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");mix-blend-mode:overlay}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 28px;position:relative;z-index:2}
+  a{color:inherit}
+
+  /* topbar */
+  .topbar{position:sticky;top:0;z-index:20;background:rgba(14,15,13,.86);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  .topbar .wrap{display:flex;align-items:center;justify-content:space-between;height:60px;gap:18px}
+  .brand{font-family:'Space Mono',monospace;font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:var(--acid);display:flex;align-items:center;gap:10px;text-decoration:none}
+  .brand .dot{width:8px;height:8px;background:var(--acid);border-radius:50%;animation:pulse 2.4s infinite}
+  @keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
+  .task-picker{font-family:'Space Mono',monospace;font-size:11px;background:var(--paper2);color:var(--ink);border:1px solid var(--line);padding:6px 10px;letter-spacing:.05em}
+  .task-picker:focus{outline:none;border-color:var(--acid-dim)}
+
+  /* hero */
+  .hero{padding:54px 0 32px;border-bottom:1px solid var(--line)}
+  .kicker{font-family:'Space Mono',monospace;font-size:12px;letter-spacing:.42em;text-transform:uppercase;color:var(--acid);margin-bottom:22px;display:flex;align-items:center;gap:14px}
+  .kicker::before{content:"";width:42px;height:1px;background:var(--acid)}
+  h1.task-t{font-family:'Gowun Batang',serif;font-weight:700;font-size:clamp(28px,5vw,46px);line-height:1.1;margin-bottom:14px}
+  h1.task-t .em{color:var(--rust);font-style:italic}
+  .task-meta{font-family:'Space Mono',monospace;font-size:12px;color:var(--ink-dim);letter-spacing:.05em;display:flex;gap:18px;flex-wrap:wrap;margin-bottom:24px}
+  .task-meta b{color:var(--ink)}
+  .task-goal{font-size:15px;color:var(--ink-dim);max-width:780px;margin-bottom:30px}
+  .task-goal b{color:var(--ink);font-weight:500}
+
+  /* KPI row */
+  .kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:8px}
+  .kpi .k{background:var(--paper);border:1px solid var(--line);padding:14px 18px}
+  .kpi .k .lbl{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:6px}
+  .kpi .k .val{font-family:'Gowun Batang',serif;font-size:26px;font-weight:700;color:var(--ink)}
+  .kpi .k .val .sub{font-size:13px;color:var(--ink-dim);font-family:'Space Mono',monospace;font-weight:400}
+  .kpi .k.ok .val{color:var(--green)}
+  .kpi .k.warn .val{color:var(--yellow)}
+  .kpi .k.bad .val{color:var(--red)}
+
+  /* section */
+  section.sec{padding:48px 0 12px;border-bottom:1px solid var(--line)}
+  section.sec:last-of-type{border-bottom:none}
+  .sec-h{display:flex;align-items:baseline;gap:14px;margin-bottom:22px}
+  .sec-h .no{font-family:'Space Mono',monospace;font-size:12px;letter-spacing:.3em;color:var(--acid)}
+  .sec-h.h .no{color:var(--rust)}
+  .sec-h h2{font-family:'Gowun Batang',serif;font-size:clamp(22px,3.6vw,32px);font-weight:700}
+  .sec-h .hint{font-size:13px;color:var(--ink-dim);flex:1;min-width:200px;text-align:right}
+
+  /* AC checklist */
+  .ac-group{margin-bottom:18px;border:1px solid var(--line);background:var(--paper)}
+  .ac-group summary{font-family:'Space Mono',monospace;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--acid);padding:14px 18px;cursor:pointer;list-style:none;display:flex;align-items:center;gap:12px;background:linear-gradient(90deg,var(--paper2),var(--paper))}
+  .ac-group summary::-webkit-details-marker{display:none}
+  .ac-group summary::before{content:"▸";color:var(--acid-dim);transition:transform .2s}
+  .ac-group[open] summary::before{transform:rotate(90deg)}
+  .ac-group summary .cnt{margin-left:auto;color:var(--ink-dim);font-size:11px;letter-spacing:.06em}
+  .ac-list{padding:8px 18px 14px}
+  .ac-item{display:flex;gap:12px;padding:8px 0;border-bottom:1px dotted var(--line);align-items:flex-start;cursor:pointer;user-select:none}
+  .ac-item:last-child{border-bottom:none}
+  .ac-item .cb{flex-shrink:0;width:16px;height:16px;border:1.5px solid var(--acid-dim);margin-top:3px;position:relative;transition:.15s;background:var(--bg)}
+  .ac-item.done .cb{background:var(--acid);border-color:var(--acid)}
+  .ac-item.done .cb::after{content:"✓";position:absolute;color:var(--bg);font-size:12px;font-weight:700;top:-2px;left:2px}
+  .ac-item .tx{font-size:14px;color:var(--ink);flex:1}
+  .ac-item.done .tx{color:var(--ink-dim);text-decoration:line-through}
+  .ac-item .tests{font-family:'Space Mono',monospace;font-size:10px;color:var(--acid-dim);letter-spacing:.05em;flex-shrink:0;padding-top:3px}
+  .ac-item .tests.none{color:var(--rust)}
+
+  /* plan traceability */
+  .plan-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  @media(max-width:780px){.plan-grid{grid-template-columns:1fr}}
+  .plan-col{background:var(--paper);border:1px solid var(--line);padding:18px}
+  .plan-col h3{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.15em;text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .plan-col.ai h3{color:var(--ink-dim)}
+  .plan-col.human h3{color:var(--rust)}
+  .plan-col.actual h3{color:var(--acid)}
+  .plan-col h3 .dot{width:8px;height:8px;border-radius:50%}
+  .plan-col.ai h3 .dot{background:var(--ink-dim)}
+  .plan-col.human h3 .dot{background:var(--rust)}
+  .plan-col.actual h3 .dot{background:var(--acid)}
+  .plan-col ul{list-style:none}
+  .plan-col li{font-size:13px;color:var(--ink-dim);padding:6px 0 6px 16px;position:relative;line-height:1.55;border-bottom:1px dotted var(--line)}
+  .plan-col li:last-child{border-bottom:none}
+  .plan-col li::before{content:"·";position:absolute;left:4px;color:var(--ink-dim)}
+  .plan-col li b{color:var(--ink);font-weight:500}
+  .plan-col li.major{color:#e8c4b0}
+  .plan-col li.major::before{content:"!";color:var(--rust);font-weight:700}
+
+  /* test matrix */
+  .matrix-wrap{overflow-x:auto;border:1px solid var(--line);background:var(--paper)}
+  table.matrix{width:100%;border-collapse:collapse;font-family:'Space Mono',monospace;font-size:11.5px}
+  table.matrix th,table.matrix td{border:1px solid var(--line);padding:6px 9px;text-align:center;white-space:nowrap}
+  table.matrix thead th{background:var(--paper2);color:var(--acid);font-weight:400;letter-spacing:.05em;text-align:left;font-size:10.5px}
+  table.matrix thead th:not(:first-child){writing-mode:vertical-rl;transform:rotate(180deg);min-width:24px;text-align:left;padding:8px 6px;color:var(--ink-dim)}
+  table.matrix tbody th{background:var(--paper2);color:var(--ink);text-align:left;font-weight:400;font-size:11.5px;letter-spacing:0;font-family:'IBM Plex Sans KR',sans-serif}
+  table.matrix td.hit{color:var(--green);font-weight:700}
+  table.matrix td.miss{color:var(--line)}
+  table.matrix tfoot td{background:var(--paper2);color:var(--ink-dim);font-size:10px;text-align:left;padding:8px 10px;letter-spacing:.05em}
+
+  /* reward hacking cards */
+  .rh-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
+  .rh-card{background:linear-gradient(135deg,#241410,#1a0f0c);border:1px solid #4a2418;padding:18px}
+  .rh-card .q{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--rust);margin-bottom:10px;line-height:1.4}
+  .rh-card .a{font-size:13.5px;color:#e8c4b0;line-height:1.6}
+  .rh-card .a b{color:var(--ink);font-weight:500}
+  .rh-card .flag{font-family:'Space Mono',monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;margin-top:12px;padding:3px 8px;display:inline-block;border:1px solid;border-radius:2px}
+  .rh-card .flag.clean{color:var(--green);border-color:var(--green)}
+  .rh-card .flag.watch{color:var(--yellow);border-color:var(--yellow)}
+  .rh-card .flag.flag{color:var(--red);border-color:var(--red)}
+
+  /* footer */
+  footer{padding:36px 0 60px;border-top:1px solid var(--line);text-align:center;font-family:'Space Mono',monospace;font-size:10.5px;color:var(--ink-dim);letter-spacing:.05em}
+  footer code{background:var(--code);padding:2px 6px;border:1px solid var(--line);color:var(--acid)}
+  footer .row{margin-top:6px}
+
+  .reveal{opacity:0;transform:translateY(14px);transition:opacity .5s ease,transform .5s ease}
+  .reveal.in{opacity:1;transform:none}
+
+  .empty-state{padding:80px 0;text-align:center;color:var(--ink-dim)}
+  .empty-state .big{font-family:'Gowun Batang',serif;font-size:24px;color:var(--ink);margin-bottom:8px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="wrap">
+    <a class="brand" href="#"><span class="dot"></span>TASK CHECK</a>
+    <select class="task-picker" id="picker" aria-label="Task 선택"></select>
+  </div>
+</div>
+
+<main class="wrap" id="main">
+  <!-- rendered by JS -->
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>데이터 소스: <code>.agent-os/tasks/&lt;slug&gt;.md</code> · <code>.agent-os/tasks/&lt;slug&gt;.review.md</code> · <code>git diff</code></div>
+    <div class="row">갱신: 사람이 명시적으로 요청할 때만 — AI는 이 HTML을 자동 재생성하지 않음 (토큰 절약)</div>
+    <div class="row">관련 학습 자료: <a href="./week2-hub.html" style="color:var(--acid)">week2-hub.html</a> · <a href="../wiki/loop-references.md" style="color:var(--acid)">loop-references.md</a></div>
+  </div>
+</footer>
+
+<script>
+/* ============================================================
+   Task Check — 산출물 검수 데이터
+   슬러그 = .agent-os/tasks/<slug>.md 파일명에서 .md를 뺀 것
+   업데이트는 사람이 명시적으로 요청할 때 AI가 갱신
+   ============================================================ */
+
+const TASKS = {
+
+"2026-05-23-post-search": {
+  title: 'GET <span class="em">/posts?q=</span> 검색 필터 (title only)',
+  date: "2026-05-23",
+  branch: "main",
+  commit: "(WIP)",
+  status: "wip",
+  goal: 'MVP의 첫 검색 기능 — <b>title only</b> case-insensitive partial LIKE. 페이지네이션과 조합. <b>병행 목적</b>: 새 <code>.agent-os/loop.md</code>의 step-3/7 Skill 인라인 링크 검증.',
+  acceptance_groups: [
+    { label: "검색 매칭", items: [
+      { text: "?q=spring → title에 'spring' 포함 case-insensitive 매칭, 정렬·페이지 메타는 필터된 결과 기준", tests:["E2E.search_match","Svc.search_query"], done:true },
+      { text: "매칭 0건 → 200 + 빈 content + totalElements=0", tests:["E2E.search_no_match"], done:true },
+      { text: "title only — content/author는 검색 대상 아님", tests:["E2E.search_title_only"], done:true },
+      { text: "매칭 2건 이상 정렬 (createdAt DESC, id DESC) 유지", tests:["E2E.search_ordering"], done:true },
+    ]},
+    { label: "회귀 / 미지정 처리", items: [
+      { text: "?q= 미지정 → 기존 list 동작 그대로 (회귀 0)", tests:["E2E.list_default","E2E.list_paged"], done:true },
+      { text: "?q= 빈 문자열 → 미지정과 동일", tests:["E2E.search_empty_q"], done:true },
+      { text: "?q=   (공백만) → 미지정과 동일", tests:["E2E.search_whitespace_q","Svc.search_blank"], done:true },
+    ]},
+    { label: "검증 실패", items: [
+      { text: "?q= 100자 초과 → 400 VALIDATION_FAILED errors[].field=q", tests:["E2E.search_oversized_q"], done:true },
+    ]},
+    { label: "Soft delete + 검색 결합", items: [
+      { text: "검색 결과에 soft-deleted post 포함 안 됨 (@SQLRestriction이 derived query에 자동 적용)", tests:["E2E.search_excludes_soft_deleted"], done:true },
+    ]},
+    { label: "Spring Data 자동 escape (불의 발견)", items: [
+      { text: "?q=% → SQL 와일드카드 아니라 literal '%' 매칭 — framework 무료 escape, Q-B drop 결정 무관", tests:["E2E.search_wildcard_literal"], done:true },
+    ]},
+    { label: "검색 × 페이지네이션 조합", items: [
+      { text: "?q=spring&page=1&size=2 → 매칭 결과의 페이지 슬라이스, totalElements는 필터된 총 개수", tests:["E2E.search_paginated"], done:true },
+    ]},
+    { label: "회귀", items: [
+      { text: "기존 29개 E2E + 단위 테스트 모두 통과 (총 39 E2E + 10 Service)", tests:["regression"], done:true },
+    ]},
+  ],
+  plan: {
+    ai_initial: [
+      "@Query HQL 검색 메서드 (AND deletedAt IS NULL 명시)",
+      "PostService.list에 q blank 분기 + 와일드카드 escape 처리 (replace %, _)",
+      "검색 범위: title + content OR LIKE",
+      "E2E ~5개",
+    ],
+    human: [
+      { text: "<b>검색 범위 title only</b> — content/author 제외 (규모상 과한 비용)", major:true },
+      { text: "<b>escape 처리 drop</b> — %, _ 그대로 와일드카드 동작 (known MVP behavior)", major:true },
+      { text: "<b>N+1 방지 명시</b> — 단일 Page&lt;Post&gt; 강제, findAllById 패턴 금지", major:true },
+      "I4 변경: @Query HQL → derived query (한 줄로 4개 요구 동시 만족)",
+    ],
+    actual: [
+      "PostRepository.findByTitleContainingIgnoreCase(String, Pageable) — derived query 1줄",
+      "PostService.list(int, int, String q) — q blank 분기 (escape 처리 없음)",
+      "PostController @RequestParam(required=false) @Size(max=100) String q",
+      "Service 단위 2개 + E2E 10개 (search 7 + 회귀 3) 추가",
+      "기존 list 테스트는 list(0,20,null) 인자 1개만 추가",
+      "<b>발견</b>: Spring Data Containing이 %/_ 자동 escape — Q-B drop 결정이 사실은 framework 레벨에서 안전성 보장됨",
+    ],
+  },
+  tests: [
+    "Svc.search_query", "Svc.search_blank",
+    "E2E.search_match", "E2E.search_no_match", "E2E.search_title_only",
+    "E2E.search_ordering", "E2E.search_empty_q", "E2E.search_whitespace_q",
+    "E2E.search_oversized_q", "E2E.search_excludes_soft_deleted",
+    "E2E.search_wildcard_literal", "E2E.search_paginated",
+    "E2E.list_default", "E2E.list_paged", "regression"
+  ],
+  reward_hacking: [
+    { q: "테스트만 만족시키고 진짜 목표를 놓쳤나?",
+      a: "<b>아니다.</b> R-2 테스트(가정: %가 와일드카드)가 실패해서 실제 framework 동작(자동 escape)이 노출됨. 가정 검증의 가치가 실현된 사례. Task Context의 Q-B 결정 자체가 framework 동작 미확인으로 잘못 정의되어 있었음 — 테스트가 이를 잡음.",
+      flag: "clean", flag_text:"clean — 가정과 실제 불일치 발견" },
+    { q: "요구사항을 좁게 해석했나?",
+      a: "title only는 사용자 요청으로 의도적 축소. 잠정안의 title+content를 사람이 줄임 → <b>narrow지만 정확한 해석</b>. 정렬에 relevance 도입 안 한 것도 좁은 해석이지만 task scope 명시.",
+      flag: "clean", flag_text:"clean — 의도된 축소" },
+    { q: "겉보기는 OK지만 운영 실패 케이스가 있나?",
+      a: "<b>주변 공백 trim 미적용 (R-1)</b>이 잠재 UX 실패. <code>?q=  spring  </code>가 literal 검색되어 매칭 안 됨. 문서화만 하고 코드 변경 안 함 — input normalization을 안 하는 정책 일관성. 추후 별도 task로 분리 가능.",
+      flag: "watch", flag_text:"watch — 공백 trim 미적용" },
+    { q: "작은 수정에 과한 추상화를 만들었나?",
+      a: "<b>아니다.</b> derived query 1줄 + 서비스 분기 1줄 + 컨트롤러 파라미터 1줄. 신규 파일 0개, 스키마 변경 0, 의존성 0. AI 첫 plan의 @Query HQL + escape 처리(~15줄)에서 사람 축소로 ~3줄로 축약.",
+      flag: "clean", flag_text:"clean — 최소 변경" },
+    { q: "Loop.md 검증 결과 (메타)",
+      a: "step 3 task-context-flow, step 7 tdd-endpoint 둘 다 명시 호출. 4-라운드 패턴 그대로 따름. Reviewer/Tester 분리 검토에서 4건 채택(R-2/R-3/T-1/T-2) 모두 <b>테스트 추가만</b> — prod 코드는 Builder 단계에서 안정. 다음 retro 후보: spring-boot-4-verify Skill에 'Spring Data derived query 키워드 동작 확인' 추가.",
+      flag: "clean", flag_text:"clean — loop 검증 성공" },
+  ],
+},
+
+"2026-05-16-post-update-delete": {
+  title: 'PUT/DELETE <span class="em">/posts/{id}</span> + soft delete',
+  date: "2026-05-16",
+  branch: "main",
+  commit: "3e04781 / 28e06c8 / 983cab2",
+  status: "merged",
+  goal: '게시판 CRUD 완성 — <b>PUT</b>으로 title/content 수정, <b>DELETE</b>로 soft delete. viewCount/createdAt 보존, soft-deleted post는 모든 조회 경로에서 비공개.',
+  acceptance_groups: [
+    { label: "PUT 성공", items: [
+      { text: "요청 body {title, content} 둘 다 필수, 200 + 갱신된 PostResponse", tests:["E2E.put_success","Svc.update_ok"], done:true },
+      { text: "title·content는 요청 값으로 갱신, updatedAt 서버 시점 overwrite", tests:["E2E.put_success"], done:true },
+      { text: "createdAt·id·author·viewCount는 보존", tests:["E2E.put_preserves"], done:true },
+      { text: "body에 author 필드가 있어도 무시 (거부 X)", tests:["E2E.put_ignores_author"], done:true },
+    ]},
+    { label: "PUT 검증 실패", items: [
+      { text: "title 누락·공백·>80 → 400 VALIDATION_FAILED errors[].field=title", tests:["E2E.put_invalid_title"], done:true },
+      { text: "content 누락·공백·>5000 → 동일 패턴", tests:["E2E.put_invalid_content"], done:true },
+      { text: "비숫자 id → 400 (Spring type-mismatch)", tests:["E2E.put_bad_id"], done:true },
+    ]},
+    { label: "PUT 자원 없음 / soft-deleted", items: [
+      { text: "존재하지 않는 id → 404 RESOURCE_NOT_FOUND", tests:["E2E.put_not_found"], done:true },
+      { text: "soft-deleted id → 404 (@SQLRestriction이 findById를 빈 Optional로)", tests:["E2E.put_soft_deleted"], done:true },
+    ]},
+    { label: "DELETE 성공", items: [
+      { text: "존재하는 id → 204 No Content (body 없음)", tests:["E2E.delete_success","Svc.delete_ok"], done:true },
+      { text: "DB에 행은 남고 deleted_at만 현재 시각으로 설정", tests:["E2E.delete_row_remains"], done:true },
+      { text: "같은 id 재DELETE → 첫 호출 204, 두 번째 404", tests:["E2E.delete_twice"], done:true },
+    ]},
+    { label: "DELETE 자원 없음", items: [
+      { text: "존재하지 않는 id → 404 RESOURCE_NOT_FOUND", tests:["E2E.delete_not_found"], done:true },
+      { text: "비숫자 id → 400 (Spring 기본)", tests:["E2E.delete_bad_id"], done:true },
+    ]},
+    { label: "Soft delete 회귀 영향", items: [
+      { text: "DELETE된 post는 GET /posts 목록에서 제외, totalElements 감소", tests:["E2E.delete_excluded_from_list"], done:true },
+      { text: "DELETE된 post에 GET /posts/{id} → 404", tests:["E2E.delete_then_get"], done:true },
+      { text: "DELETE된 post의 viewCount 증가 시도 → @Modifying 쿼리에 deleted_at IS NULL 명시 → 0 row affected → 404", tests:["E2E.delete_view_count_blocked"], done:true },
+    ]},
+    { label: "동시성", items: [
+      { text: "동시 PUT N회 — last-write-wins (no @Version)", tests:[], done:false },
+      { text: "동시 DELETE N회 — 모두 성공 가능 (acceptable, 클라 관점에서 차이 없음)", tests:[], done:false },
+    ]},
+    { label: "회귀", items: [
+      { text: "기존 23개 테스트 모두 통과", tests:["regression"], done:true },
+      { text: "PostResponse, PostCreateRequest JSON 형식 불변", tests:["E2E.create_unchanged"], done:true },
+      { text: "POST·GET·GET-by-id 동작 불변", tests:["E2E.*"], done:true },
+    ]},
+  ],
+  plan: {
+    ai_initial: [
+      "hard delete — repo.deleteById(id) (단순화)",
+      "PostNotFoundException + RESOURCE_NOT_FOUND 재사용",
+      "스키마 변경 없음",
+      "PostUpdateRequest 신규 record + @NotBlank @Size",
+      "PostController @PutMapping/@DeleteMapping 추가",
+    ],
+    human: [
+      { text: "hard delete → <b>soft delete</b>로 뒤집음", major:true },
+      "근거: 게시판 도메인 통상 관행 (복원·감사·삭제 시점 보존)",
+      "도미노 인지: V2 마이그레이션 + @SQLRestriction + @Modifying 쿼리 필터 + 도메인 메서드 + 회귀 테스트",
+      "deletedAt은 응답 노출 안 함 (soft-deleted post 자체가 조회 안 되므로 불필요)",
+      "이전 Forbidden 일부 해제: \"새 Flyway 금지\" → V2 허용",
+    ],
+    actual: [
+      "V2 Flyway 마이그레이션 — deleted_at TIMESTAMP WITH TIME ZONE NULL",
+      "Post 엔티티 — deletedAt 필드 + 클래스 @SQLRestriction(\"deleted_at IS NULL\")",
+      "Post.delete(Instant) / Post.update(...) 도메인 메서드 (setter 미노출)",
+      "PostRepository.incrementViewCount 쿼리에 AND p.deletedAt IS NULL 명시",
+      "PostUpdateRequest record (title, content) — @NotBlank @Size",
+      "29개 E2E 테스트 + REST Docs 생성",
+    ],
+  },
+  tests: [
+    "E2E.put_success", "E2E.put_preserves", "E2E.put_ignores_author",
+    "E2E.put_invalid_title", "E2E.put_invalid_content", "E2E.put_bad_id",
+    "E2E.put_not_found", "E2E.put_soft_deleted",
+    "E2E.delete_success", "E2E.delete_row_remains", "E2E.delete_twice",
+    "E2E.delete_not_found", "E2E.delete_bad_id",
+    "E2E.delete_excluded_from_list", "E2E.delete_then_get", "E2E.delete_view_count_blocked",
+    "E2E.create_unchanged", "E2E.*",
+    "Svc.update_ok", "Svc.delete_ok",
+    "regression"
+  ],
+  reward_hacking: [
+    { q: "테스트만 만족시키고 진짜 목표를 놓쳤나?",
+      a: "<b>아니다.</b> 'soft delete' 자체가 사람의 도메인 판단으로 뒤집힌 결정 — 테스트 통과 위주가 아닌 도메인 정합성 기준. 다만 동시성 케이스는 acceptance에 명시했지만 테스트 부재 → <b>관찰 영역</b>으로 남겨둠.",
+      flag: "watch", flag_text:"watch — 동시성 미테스트" },
+    { q: "요구사항을 좁게 해석했나?",
+      a: "PUT의 'author 필드 무시'는 거부도 수용도 아닌 <b>침묵 무시</b>로 구현 — 좁은 해석으로 볼 여지 있음. 그러나 task context에 명시된 요구사항이라 위반은 아님.",
+      flag: "clean", flag_text:"clean" },
+    { q: "겉보기는 OK지만 운영 실패 케이스가 있나?",
+      a: "@Modifying @Query는 @SQLRestriction 미적용이라는 <b>JPA 함정</b>을 명시 처리(incrementViewCount에 explicit filter). 이 함정을 모르면 soft-deleted post의 viewCount가 계속 증가하는 무성한 실패가 발생할 뻔. <b>가장 큰 잠재 reward hacking을 회피한 사례.</b>",
+      flag: "clean", flag_text:"clean — 함정 회피" },
+    { q: "작은 수정에 과한 추상화를 만들었나?",
+      a: "<b>아니다.</b> setter 대신 도메인 메서드(update/delete) 노출은 추상화가 아닌 캡슐화 — convention에 명시. @SQLRestriction은 한 줄 어노테이션으로 도입. 추가 인터페이스·헬퍼 없음.",
+      flag: "clean", flag_text:"clean" },
+  ],
+},
+
+"2026-05-16-rest-docs": {
+  title: 'REST Docs for <span class="em">29 E2E tests</span>',
+  date: "2026-05-16",
+  branch: "main",
+  commit: "f26b7bf",
+  status: "merged",
+  goal: 'Spring REST Docs로 29개 E2E 테스트 전부에 대해 스니펫 생성 + asciidoctor HTML 출력. 문서를 코드와 동기화.',
+  acceptance_groups: [
+    { label: "스니펫 생성", items: [
+      { text: "29개 E2E 테스트 전부에서 REST Docs 스니펫 추출", tests:["E2E.*"], done:true },
+      { text: "asciidoctor로 HTML 산출물 빌드", tests:["build"], done:true },
+    ]},
+    { label: "회귀", items: [
+      { text: "기존 테스트 동작 불변 — 스니펫 추출만 추가", tests:["regression"], done:true },
+    ]},
+  ],
+  plan: {
+    ai_initial: ["선택된 테스트에만 REST Docs 적용 (대표 케이스 위주)"],
+    human: [{ text:"<b>전수 적용</b> — 29개 전부", major:true }, "스니펫이 곧 회귀 안전망 — 빠진 케이스가 곧 문서 공백"],
+    actual: ["29개 테스트에 document(...) 호출 추가", "asciidoctor 빌드 → docs/asciidoc HTML", "테스트 실행 시 스니펫 자동 생성"],
+  },
+  tests: ["E2E.*", "build", "regression"],
+  reward_hacking: [
+    { q:"커버리지 100%처럼 보이지만 실제 문서 품질은?", a:"각 스니펫이 실제 요청·응답을 기록 — 자동 생성이라 거짓말 불가. 다만 <b>설명문은 별도 작성 필요</b> (현재는 raw snippet만).", flag:"watch", flag_text:"watch — 설명문 부재" },
+    { q:"REST Docs가 회귀를 잡는가?", a:"스니펫이 실패하면 빌드 깨짐 → API 계약 변경 강제 감지. <b>곧 회귀 안전망 역할.</b>", flag:"clean", flag_text:"clean" },
+  ],
+},
+
+"2026-05-16-post-detail": {
+  title: 'GET <span class="em">/posts/{id}</span> + viewCount 증가',
+  date: "2026-05-16",
+  branch: "main",
+  commit: "ee2224a",
+  status: "merged",
+  goal: '게시글 상세 조회. 호출 시 viewCount 증가. 첫 워크플로우 통합 테스트.',
+  acceptance_groups: [
+    { label: "GET 성공", items: [
+      { text: "존재하는 id → 200 + PostResponse", tests:["E2E.get_detail_ok"], done:true },
+      { text: "viewCount가 호출 시마다 1씩 증가", tests:["E2E.get_increments_view"], done:true },
+    ]},
+    { label: "에러", items: [
+      { text: "존재하지 않는 id → 404 RESOURCE_NOT_FOUND", tests:["E2E.get_not_found"], done:true },
+      { text: "비숫자 id → 400", tests:["E2E.get_bad_id"], done:true },
+    ]},
+  ],
+  plan: {
+    ai_initial: ["findById + map to PostResponse"],
+    human: ["viewCount 증가를 <b>atomic UPDATE</b>로 (concurrent read 보호)", "PostNotFoundException + RESOURCE_NOT_FOUND 신설"],
+    actual: ["PostRepository.incrementViewCount(@Modifying @Query)", "PostNotFoundException + ErrorCode.RESOURCE_NOT_FOUND", "RequestValidationExceptionHandler에 handlePostNotFound 추가"],
+  },
+  tests: ["E2E.get_detail_ok","E2E.get_increments_view","E2E.get_not_found","E2E.get_bad_id"],
+  reward_hacking: [
+    { q:"viewCount 증가의 동시성?", a:"@Modifying 쿼리로 DB 레벨 atomic — race condition 없음. <b>설계 시점에 의식한 회피.</b>", flag:"clean", flag_text:"clean" },
+    { q:"404 메시지가 내부 경로 노출?", a:"ErrorResponse 본문은 code만 — 스택트레이스·SQL 노출 없음.", flag:"clean", flag_text:"clean" },
+  ],
+},
+
+"2026-05-16-error-contract": {
+  title: '에러 응답 <span class="em">계약 통일</span>',
+  date: "2026-05-16",
+  branch: "main",
+  commit: "(squashed)",
+  status: "merged",
+  goal: 'ProblemDetail 대신 커스텀 ErrorResponse + ErrorCode로 통일. VALIDATION_FAILED·RESOURCE_NOT_FOUND 2종.',
+  acceptance_groups: [
+    { label: "응답 포맷", items: [
+      { text: "ErrorResponse record (code, message, errors[])", tests:["E2E.error_shape"], done:true },
+      { text: "Content-Type: application/json (problem+json 아님)", tests:["E2E.error_shape"], done:true },
+    ]},
+    { label: "코드 매핑", items: [
+      { text: "검증 실패 → VALIDATION_FAILED, errors[].field 채움", tests:["E2E.*_invalid_*"], done:true },
+      { text: "자원 없음 → RESOURCE_NOT_FOUND", tests:["E2E.*_not_found"], done:true },
+    ]},
+  ],
+  plan: {
+    ai_initial: ["Spring ProblemDetail 활용 (기본값)"],
+    human: [{ text:"<b>커스텀 ErrorResponse + ErrorCode enum</b> 도입", major:true }, "이유: 코드 enum이 클라이언트 분기에 명확. errors[]에 field별 메시지 풍부."],
+    actual: ["ErrorResponse record", "ErrorCode enum (VALIDATION_FAILED, RESOURCE_NOT_FOUND)", "RequestValidationExceptionHandler 통합 (@RestControllerAdvice)", "HandlerMethodValidationException 핸들러 (Spring 6.1+)"],
+  },
+  tests: ["E2E.error_shape","E2E.*_invalid_*","E2E.*_not_found"],
+  reward_hacking: [
+    { q:"표준 ProblemDetail 안 쓴 게 좁은 해석?", a:"표준에서 벗어남 — 트레이드오프 명시 (conventions.md에 기록). <b>의도된 deviation</b>.", flag:"watch", flag_text:"watch — 표준 deviation" },
+  ],
+},
+
+"2026-05-16-post-list": {
+  title: 'GET <span class="em">/posts</span> (페이지네이션)',
+  date: "2026-05-16",
+  branch: "main",
+  commit: "(squashed)",
+  status: "merged",
+  goal: '게시글 목록 페이지네이션. 커스텀 PageResponse. 서버 고정 정렬.',
+  acceptance_groups: [
+    { label: "기본", items: [
+      { text: "?page=N&size=M, 기본 page=0 size=20", tests:["E2E.list_default","E2E.list_paged"], done:true },
+      { text: "size 클램프 [1,100], page>=0, 범위 외 → 400", tests:["E2E.list_bad_params"], done:true },
+      { text: "정렬은 서버 고정 (createdAt desc, id desc) — sort 파라미터 없음", tests:["E2E.list_order"], done:true },
+      { text: "응답: PageResponse{content,page,size,totalElements,totalPages}", tests:["E2E.list_shape"], done:true },
+    ]},
+  ],
+  plan: {
+    ai_initial: ["Spring Page<T> 직접 직렬화"],
+    human: [{ text:"<b>커스텀 PageResponse</b> 사용 — Spring Page<T> 직접 직렬화 금지", major:true }, "이유: Spring Page<T>는 내부 구조 노출, 클라이언트 계약 안정성 ↓"],
+    actual: ["PageResponse record", "PostController @GetMapping('/posts') with @RequestParam @Min/@Max", "Sort.by(Order.desc('createdAt'), Order.desc('id')) 고정"],
+  },
+  tests: ["E2E.list_default","E2E.list_paged","E2E.list_bad_params","E2E.list_order","E2E.list_shape"],
+  reward_hacking: [
+    { q:"sort 파라미터 안 노출이 좁은 해석?", a:"conventions.md에 \"NO sort param\" 명시 — 의도. 차후 확장 시 별도 결정.", flag:"clean", flag_text:"clean" },
+    { q:"size 클램프가 silent하면?", a:"범위 외 → <b>400</b>으로 거부 — silent clamp 회피. 클라이언트 즉시 인지.", flag:"clean", flag_text:"clean" },
+  ],
+},
+
+"2026-05-15-post-create": {
+  title: 'POST <span class="em">/posts</span> (첫 endpoint)',
+  date: "2026-05-15",
+  branch: "main",
+  commit: "(initial)",
+  status: "merged",
+  goal: '첫 endpoint. TDD 4라운드 패턴 확립. record DTO + @NotBlank @Size 검증.',
+  acceptance_groups: [
+    { label: "POST 성공", items: [
+      { text: "{author,title,content} → 201 + Location + PostResponse", tests:["E2E.create_ok"], done:true },
+      { text: "id 생성, createdAt/updatedAt 서버 시점, viewCount=0", tests:["E2E.create_defaults"], done:true },
+    ]},
+    { label: "검증", items: [
+      { text: "필드 누락/공백/길이초과 → 400 VALIDATION_FAILED", tests:["E2E.create_invalid"], done:true },
+    ]},
+  ],
+  plan: {
+    ai_initial: ["Lombok @Data로 DTO"],
+    human: [{ text:"<b>Lombok 금지, Java record 사용</b>", major:true }, "이유: 의존성 최소화, JDK 표준 우선"],
+    actual: ["PostCreateRequest record + @NotBlank @Size", "PostResponse record (7 필드)", "PostController @PostMapping", "PostService.create with Clock", "tdd-endpoint Skill 4라운드"],
+  },
+  tests: ["E2E.create_ok","E2E.create_defaults","E2E.create_invalid"],
+  reward_hacking: [
+    { q:"첫 endpoint라 패턴 과도하게 미리 잡았나?", a:"TDD 4라운드 + Skill 추출은 <b>2회차에 검증</b>됨. 첫 회차에 미리 깐 인프라가 아닌 점진 추출.", flag:"clean", flag_text:"clean" },
+  ],
+},
+
+};
+
+/* ============================================================
+   렌더링
+   ============================================================ */
+
+const SLUGS = Object.keys(TASKS);
+
+function buildPicker(){
+  const p = document.getElementById("picker");
+  p.innerHTML = SLUGS.map(s => `<option value="${s}">${s}</option>`).join("");
+  p.addEventListener("change", e => { location.hash = e.target.value; });
+}
+
+function pickInitial(){
+  const h = location.hash.replace(/^#/, "");
+  if (h && TASKS[h]) return h;
+  return SLUGS[0]; // 가장 최근 task (선언 순서 = 최근순)
+}
+
+function render(slug){
+  const t = TASKS[slug];
+  if(!t){ document.getElementById("main").innerHTML = `<div class="empty-state"><div class="big">알 수 없는 task</div><div>슬러그: <code>${slug}</code></div></div>`; return; }
+  document.getElementById("picker").value = slug;
+
+  // KPI 계산
+  const allItems = t.acceptance_groups.flatMap(g => g.items);
+  const total = allItems.length;
+  const done = allItems.filter(i => i.done).length;
+  const pct = total ? Math.round(done/total*100) : 0;
+  const planChanges = (t.plan.human||[]).length;
+  const majorChanges = (t.plan.human||[]).filter(x => typeof x === 'object' && x.major).length;
+  const testCount = (t.tests||[]).length;
+  const rhFlags = (t.reward_hacking||[]).filter(r => r.flag !== 'clean').length;
+
+  const kpiClass = (pct === 100) ? 'ok' : (pct >= 80 ? 'warn' : 'bad');
+  const rhClass = rhFlags === 0 ? 'ok' : (rhFlags <= 2 ? 'warn' : 'bad');
+
+  const html = `
+    <div class="hero">
+      <div class="kicker">Task Check · ${t.date}</div>
+      <h1 class="task-t">${t.title}</h1>
+      <div class="task-meta">
+        <span><b>slug</b> ${slug}</span>
+        <span><b>branch</b> ${t.branch||'—'}</span>
+        <span><b>commit</b> ${t.commit||'—'}</span>
+        <span><b>status</b> ${t.status||'—'}</span>
+      </div>
+      <p class="task-goal">${t.goal}</p>
+      <div class="kpi">
+        <div class="k ${kpiClass}"><div class="lbl">Acceptance 완료율</div><div class="val">${pct}<span class="sub">% (${done}/${total})</span></div></div>
+        <div class="k"><div class="lbl">Plan 보정 / Major</div><div class="val">${planChanges}<span class="sub"> / ${majorChanges} major</span></div></div>
+        <div class="k"><div class="lbl">테스트 케이스</div><div class="val">${testCount}</div></div>
+        <div class="k ${rhClass}"><div class="lbl">Reward Hacking 플래그</div><div class="val">${rhFlags}<span class="sub"> / ${(t.reward_hacking||[]).length}</span></div></div>
+      </div>
+    </div>
+
+    <section class="sec">
+      <div class="sec-h"><span class="no">01</span><h2>Acceptance Criteria</h2><span class="hint">클릭으로 ✓ 토글 — 검수 메모용. 새로고침하면 초기화.</span></div>
+      ${t.acceptance_groups.map((g,gi)=>`
+        <details class="ac-group" ${gi<2?'open':''}>
+          <summary>${g.label}<span class="cnt">${g.items.filter(i=>i.done).length}/${g.items.length}</span></summary>
+          <div class="ac-list">
+            ${g.items.map((it,ii)=>`
+              <div class="ac-item ${it.done?'done':''}" data-gi="${gi}" data-ii="${ii}">
+                <div class="cb"></div>
+                <div class="tx">${it.text}</div>
+                <div class="tests ${(!it.tests||it.tests.length===0)?'none':''}">${(!it.tests||it.tests.length===0)?'no test':it.tests.join(' · ')}</div>
+              </div>
+            `).join("")}
+          </div>
+        </details>
+      `).join("")}
+    </section>
+
+    <section class="sec">
+      <div class="sec-h h"><span class="no">02</span><h2>계획 추적성</h2><span class="hint">AI 첫 plan → 사람 corrections → 실제 변경</span></div>
+      <div class="plan-grid">
+        <div class="plan-col ai"><h3><span class="dot"></span>AI 첫 plan</h3><ul>${t.plan.ai_initial.map(x=>`<li>${x}</li>`).join("")}</ul></div>
+        <div class="plan-col human"><h3><span class="dot"></span>사람 corrections</h3><ul>${t.plan.human.map(x=>{const o=typeof x==='object';return `<li class="${o&&x.major?'major':''}">${o?x.text:x}</li>`;}).join("")}</ul></div>
+        <div class="plan-col actual"><h3><span class="dot"></span>실제 변경</h3><ul>${t.plan.actual.map(x=>`<li>${x}</li>`).join("")}</ul></div>
+      </div>
+    </section>
+
+    <section class="sec">
+      <div class="sec-h"><span class="no">03</span><h2>테스트 1:1 매핑</h2><span class="hint">행 = Acceptance 항목 · 열 = 테스트 · ●는 해당 테스트가 그 항목을 커버</span></div>
+      <div class="matrix-wrap">${renderMatrix(t)}</div>
+    </section>
+
+    <section class="sec">
+      <div class="sec-h h"><span class="no">04</span><h2>Reward Hacking 점검</h2><span class="hint">"테스트만 만족 / 좁은 해석 / 운영 실패 / 과한 추상화"</span></div>
+      <div class="rh-grid">
+        ${t.reward_hacking.map(r=>`
+          <div class="rh-card">
+            <div class="q">${r.q}</div>
+            <div class="a">${r.a}</div>
+            <div class="flag ${r.flag}">${r.flag_text||r.flag}</div>
+          </div>
+        `).join("")}
+      </div>
+    </section>
+  `;
+  document.getElementById("main").innerHTML = html;
+
+  // checkbox 토글
+  document.querySelectorAll(".ac-item").forEach(el=>{
+    el.addEventListener("click", ()=> el.classList.toggle("done"));
+  });
+
+  // reveal
+  requestAnimationFrame(()=>{
+    document.querySelectorAll(".hero, section.sec, .ac-group").forEach((el,i)=>{
+      el.classList.add("reveal");
+      setTimeout(()=>el.classList.add("in"), 30+i*40);
+    });
+  });
+}
+
+function renderMatrix(t){
+  const rows = [];
+  t.acceptance_groups.forEach(g=>{
+    g.items.forEach(it=>{
+      rows.push({ label: `[${g.label}] ${it.text.length>56?it.text.slice(0,54)+"…":it.text}`, tests: it.tests||[] });
+    });
+  });
+  const cols = t.tests || [];
+  if(cols.length === 0) return '<div style="padding:20px;color:var(--ink-dim);font-size:13px">테스트 등록 없음</div>';
+  let html = '<table class="matrix"><thead><tr><th>Acceptance ↓ / Test →</th>';
+  cols.forEach(c => html += `<th>${c}</th>`);
+  html += '</tr></thead><tbody>';
+  rows.forEach(r=>{
+    html += `<tr><th>${r.label}</th>`;
+    cols.forEach(c=>{
+      const hit = r.tests.includes(c) || r.tests.some(t => t.endsWith('*') && c.startsWith(t.slice(0,-1)));
+      html += `<td class="${hit?'hit':'miss'}">${hit?'●':'—'}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody><tfoot><tr><td colspan="' + (cols.length+1) + '">●는 해당 테스트가 acceptance 항목을 커버함을 사람이 표시한 매핑. 비어있는 행 = 테스트 공백 (검수 신호).</td></tr></tfoot></table>';
+  return html;
+}
+
+/* init */
+buildPicker();
+render(pickInitial());
+window.addEventListener("hashchange", ()=> render(pickInitial()));
+</script>
+</body>
+</html>
