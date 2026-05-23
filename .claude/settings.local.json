@@ -3,7 +3,11 @@
     "allow": [
       "WebFetch(domain:github.com)",
       "Bash(gh api *)",
-      "Bash(gh search *)"
+      "Bash(gh search *)",
+      "WebSearch",
+      "WebFetch(domain:news.hada.io)",
+      "Bash(./gradlew test *)",
+      "Bash(git commit -m ' *)"
     ],
     "deny": [
       "Edit(gradlew)",
