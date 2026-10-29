@@ -63,7 +63,7 @@ AI produces:
 3. **Acceptance criteria** key highlights.
 4. **Risks watched** (per `docs/agents/workflow.md` step 9 — concurrent writes, validation failure modes, etc.).
 5. **Interpretive points** (`I1`, `I2`, ...): assumptions the AI made when the Task Context was silent. **Each one a row that user can override**.
-6. **Open questions** (`Q-A`, `Q-B`, ...): genuine ambiguities the AI did NOT fill in.
+6. **Open questions** (`Q-A`, `Q-B`, ...): genuine ambiguities the AI did NOT fill in. **When a Q-row has 2+ non-trivial alternatives, invoke the `trade-off-table` Skill to render the row as pros/cons table + axis line — prevents the "잠정안: X" without showing what was rejected" failure mode (source: 2026-05-23 post-comments Q-A).**
 
 ### 4. Human corrects
 

@@ -3,7 +3,7 @@
 스터디 멤버가 공유한 10개 외부 URL을 정리한 폴더. 각 URL은 `<slug>.md`에 핵심 요약·인용·loop.md 적용 가능 지점이 담겨 있음.
 
 수집 일자: 2026-05-23
-관련 학습 허브: [`docs/week2-hub.html`](../week2-hub.html)
+관련 학습 허브: [`docs/html/week2-hub.html`](../html/week2-hub.html)
 스터디 원문(Notion): [Week 2주 자료](https://www.notion.so/36885ab46da881c3b1b7ffb95d2c3cd5)
 
 ## Loop 관련도 한눈에

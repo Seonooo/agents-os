@@ -28,6 +28,7 @@ Reusable workflows live under `.claude/skills/<name>/SKILL.md`. Claude Code disc
 - `.claude/skills/tdd-endpoint/` — 4-round TDD pattern for adding/refactoring HTTP endpoints.
 - `.claude/skills/spring-boot-4-verify/` — verify-before-guessing recipe for Spring Boot 4 surprises (package moves, autoconfig module splits, API renames) + migration catalog.
 - `.claude/skills/task-context-flow/` — 7-step ritual for starting any non-trivial task (template → fill → AI summary → human corrections → review.md → implement).
+- `.claude/skills/trade-off-table/` — pros/cons table + trade-off axis form for decisions with 2+ non-trivial alternatives. Companion to `task-context-flow` step 3 (Q-rows).
 
 When a workflow is reused 2+ times, log it in `docs/agents/skill-candidates.md` and extract when stable.
 

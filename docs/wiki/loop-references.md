@@ -5,7 +5,7 @@
 > Week 2-1 한정. Harness 쪽(B 그룹) 자료는 추후 `harness-references.md`로 분리 예정.
 
 작성 일자: 2026-05-23
-관련 문서: [`docs/raw/index.md`](../raw/index.md) · [`docs/week2-hub.html`](../week2-hub.html) · [`.agent-os/loop.md`](../../.agent-os/loop.md)
+관련 문서: [`docs/raw/index.md`](../raw/index.md) · [`docs/html/week2-hub.html`](../html/week2-hub.html) · [`.agent-os/loop.md`](../../.agent-os/loop.md)
 
 ---
 
@@ -95,6 +95,8 @@
    - 근거: Osmani Sprint Contract, walkinglabs 실패지점 ①, OpenAI Codex Loop의 quadratic 회피 동기
 
 이 두 섹션 추가가 다음 세션의 가장 가능성 높은 작업 (사용자 결정 대기).
+
+> **업데이트 (2026-05-24)** — 위 §5는 *작성 당시(2026-05-23)의 판단 스냅샷*이며 원문 그대로 보존한다. 이후 두 섹션 모두 반영 완료: `.agent-os/loop.md`에 `## Role Prompts`(현 :21), `## Exit Criteria`(현 :35) 존재. §3.2 표의 실패지점 ①(섣부른 완료)·④(미정리 종료)도 Exit Criteria + step 11(재사용 기록)로 메워졌다. 또한 본문이 인용한 "loop.md(34줄)"는 섹션 추가 후 현재 54줄. 이 노트는 다음 작업자가 §5를 "미완 TODO"로 오인하지 않도록 덧붙인 것이며, 위 분석 텍스트 자체는 수정하지 않았다.
 
 ## 부록 — 한 줄 인용 모음
 
